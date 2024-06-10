@@ -2,16 +2,18 @@ import json
 from datetime import datetime
 import requests
 import csv
+from dotenv import load_dotenv
+import os
 
-hh_api_key = "HH_API_KEY"
+hh_api_key = os.getenv('HH_API_KEY')
 headers = {
   "Authorization": f"Bearer {hh_api_key}",
   "Content-Type": "application/json"
 }
 project_id = "HH_PROJECT_ID"
 
-dataset_url = 'https://api.honeyhive.ai/datasets'
-datapoint_url = 'https://api.honeyhive.ai/datapoints'
+dataset_url = 'http://localhost:4785/datasets'
+datapoint_url = 'http://localhost:4785/datapoints'
 
 dataset_name = "" # Name of the dataset 
 dataset_description = """

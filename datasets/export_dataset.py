@@ -1,18 +1,17 @@
 import json
 from datetime import datetime
 import requests
+from dotenv import load_dotenv
+import os
 
-hh_api_key = "HH_API_KEY"
+hh_api_key = os.getenv('HH_API_KEY')
 headers = {
   "Authorization": f"Bearer {hh_api_key}",
   "Content-Type": "application/json"
 }
-project_id = "HH_PROJECT_ID"
 
-dataset_url = 'https://api.honeyhive.ai/datasets'
-datapoint_url = 'https://api.honeyhive.ai/datapoints'
-
-dataset_name = "" # Name of the dataset to export
+dataset_url = 'http://localhost:4785/datasets'
+datapoint_url = 'http://localhost:4785/datapoints'
 
 def get_dataset_from_name(dataset_name, project_id):
     data = {'project': project_id, 'type': 'evaluation'}
@@ -37,7 +36,7 @@ def get_dataset_from_name(dataset_name, project_id):
 
     return None
 
-def get_datapoints_from_ids(datapoints_ids):
+def get_datapoints_from_ids(project_id, datapoints_ids):
     batch_size=10
     datapoints = []
 
@@ -58,19 +57,27 @@ def get_datapoints_from_ids(datapoints_ids):
 
     return datapoints
 
-def export_dataset(dataset_name, project_id):
+def export_dataset(dataset_name, project_id, size=None):
+    print(f"Starting export of dataset: {dataset_name} for project ID: {project_id}")
     dataset = get_dataset_from_name(dataset_name, project_id)
     if dataset is None:
         print(f"Dataset {dataset_name} not found")
         return None
+    else:
+        print(f"Dataset {dataset_name} found successfully.")
     
     datapoints_ids = dataset['datapoints']
-    datapoints = get_datapoints_from_ids(datapoints_ids)
+    print(f"Fetching datapoints for dataset: {dataset_name}")
+    if size:
+        datapoints_ids = datapoints_ids[:size]
+    
+    datapoints = get_datapoints_from_ids(project_id, datapoints_ids)
+    if datapoints is None:
+        print(f"Failed to fetch datapoints for dataset: {dataset_name}")
+        return None
+    else:
+        print(f"Datapoints fetched successfully for dataset: {dataset_name}")
 
     dataset['datapoints'] = datapoints
+    print(f"Export completed successfully for dataset: {dataset_name}")
     return dataset
-
-if __name__ == '__main__':
-    dataset = export_dataset(dataset_name, project_id)
-    with open('results.txt', 'w') as file:
-        file.write(str(dataset))
