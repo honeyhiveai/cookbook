@@ -8,7 +8,7 @@ dotenv.config();
 // Initialize clients
 const openai = new OpenAI();
 const pc = new Pinecone();
-const index = pc.index("your-index-name");
+const index = pc.index(process.env.PINECONE_INDEX!);
 
 async function embedQuery(query: string): Promise<number[]> {
     const res = await openai.embeddings.create({
