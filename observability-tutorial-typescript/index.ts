@@ -6,9 +6,9 @@ import { HoneyHiveTracer } from 'honeyhive';
 dotenv.config();
 
 // Initialize clients
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const openai = new OpenAI();
 const pc = new Pinecone();
-const index = pc.index("chunk-size-512");
+const index = pc.index("your-index-name");
 
 async function embedQuery(query: string): Promise<number[]> {
     const res = await openai.embeddings.create({
