@@ -13,7 +13,7 @@ This directory contains a script for evaluating AI models on the Putnam 2023 Mat
 
 1. Clone this repository:
    ```
-   git clone https://github.com/yourusername/putnam-2023-ai-eval.git
+   git clone https://github.com/honeyhiveai/cookbook
    cd putnam-2023-ai-eval
    ```
 
@@ -25,7 +25,7 @@ This directory contains a script for evaluating AI models on the Putnam 2023 Mat
 
 3. Install the required packages:
    ```
-   pip install openai honeyhive
+   pip install -r requirements.txt
    ```
 
 4. Update the API keys and project name in `putnam_eval_script.py`:
