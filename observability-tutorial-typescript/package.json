@@ -3,6 +3,7 @@
     "version": "1.0.0",
     "description": "JavaScript implementation of RAG pipeline with OpenAI, Pinecone, and HoneyHive",
     "main": "observability-example.js",
+    "type": "commonjs",
     "scripts": {
         "start": "node observability-example.js"
     },

@@ -15,7 +15,7 @@ const tracer = await HoneyHiveTracer.init({
 // Initialize clients
 const openai = new OpenAI();
 const pc = new Pinecone();
-const index = pc.index("chunk-size-512");
+const index = pc.index(process.env.PINECONE_INDEX!);
 
 async function embedQuery(query) {
     const res = await openai.embeddings.create({
