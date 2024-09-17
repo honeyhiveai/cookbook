@@ -11,8 +11,8 @@ from honeyhive.tracer.custom import trace
 
 # Initialize HoneyHive Tracer
 HoneyHiveTracer.init(
-    api_key=os.environ["HH_API_KEY"],
-    project=os.environ["HH_PROJECT"],
+    api_key="your-honeyhive-api-key",
+    project="your-honeyhive-project-name",
     source="dev",
     session_name="RAG Session"
 )
@@ -20,7 +20,7 @@ HoneyHiveTracer.init(
 # Initialize clients
 openai_client = OpenAI()
 pc = Pinecone()
-index = pc.Index("chunk-size-512")
+index = pc.Index("your-index-name")
 
 def embed_query(query):
     res = openai_client.embeddings.create(
