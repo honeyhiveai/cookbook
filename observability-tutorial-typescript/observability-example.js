@@ -1,0 +1,76 @@
+import OpenAI from 'openai';
+import { Pinecone } from '@pinecone-database/pinecone';
+import { HoneyHiveTracer } from 'honeyhive';
+import dotenv from 'dotenv';
+dotenv.config();
+
+// Initialize HoneyHive Tracer
+const tracer = await HoneyHiveTracer.init({
+    apiKey: process.env.HH_API_KEY,
+    project: process.env.HH_PROJECT,
+    source: "dev",
+    sessionName: "JS RAG Session"
+});
+
+// Initialize clients
+const openai = new OpenAI();
+const pc = new Pinecone();
+const index = pc.index(process.env.PINECONE_INDEX!);
+
+async function embedQuery(query) {
+    const res = await openai.embeddings.create({
+        model: "text-embedding-ada-002",
+        input: query
+    });
+    return res.data[0].embedding;
+}
+
+async function getRelevantDocuments(query) {
+    const queryVector = await embedQuery(query);
+    const res = await index.query({
+        vector: queryVector,
+        topK: 3,
+        includeMetadata: true
+    });
+    return res.matches.map(item => item.metadata._node_content);
+}
+
+async function generateResponse(context, query) {
+    const prompt = `Context: ${context}\n\nQuestion: ${query}\n\nAnswer:`;
+    const response = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+            { role: "system", content: "You are a helpful assistant." },
+            { role: "user", content: prompt }
+        ]
+    });
+    return response.choices[0].message.content || "";
+}
+
+async function ragPipeline(query) {
+    const docs = await getRelevantDocuments(query);
+    const response = await generateResponse(docs.join("\n"), query);
+    return response;
+}
+
+async function main() {
+    await tracer.trace(async () => {
+        const query = "What does the document talk about?";
+        const response = await ragPipeline(query);
+        console.log(`Query: ${query}`);
+        console.log(`Response: ${response}`);
+    });
+
+    tracer.setMetadata({
+        "experiment-id": 123
+    });
+
+    // Simulate getting user feedback
+    const userRating = 4;
+    tracer.setFeedback({
+        rating: userRating,
+        comment: "The response was accurate and helpful."
+    });
+}
+
+main().catch(console.error);

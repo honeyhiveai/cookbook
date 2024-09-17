@@ -1,0 +1,16 @@
+{
+    "name": "honeyhive-js-implementation",
+    "version": "1.0.0",
+    "description": "JavaScript implementation of RAG pipeline with OpenAI, Pinecone, and HoneyHive",
+    "main": "observability-example.js",
+    "type": "commonjs",
+    "scripts": {
+        "start": "node observability-example.js"
+    },
+    "dependencies": {
+        "@pinecone-database/pinecone": "^3.0.3",
+        "dotenv": "^16.0.3",
+        "honeyhive": "^1.0.5",
+        "openai": "^4.0.0"
+    }
+}
