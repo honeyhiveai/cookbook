@@ -1,0 +1,20 @@
+{
+    "name": "typescript-rag-implementation",
+    "version": "1.0.0",
+    "description": "TypeScript implementation of RAG pipeline with OpenAI, Pinecone, and HoneyHive",
+    "main": "index.ts",
+    "scripts": {
+        "start": "npx tsx index.ts"
+    },
+    "dependencies": {
+        "@pinecone-database/pinecone": "^3.0.3",
+        "dotenv": "^16.0.3",
+        "honeyhive": "^1.0.5",
+        "openai": "^4.0.0"
+    },
+    "devDependencies": {
+        "@types/node": "^18.0.0",
+        "tsx": "^3.12.0",
+        "typescript": "^4.9.5"
+    }
+}
