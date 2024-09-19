@@ -1,19 +1,7 @@
-import os
 from openai import OpenAI
 from pinecone import Pinecone
 
-# set imports
-from honeyhive.tracer import HoneyHiveTracer
-from honeyhive.tracer.custom import trace
-
-# Initialize HoneyHive Tracer
-HoneyHiveTracer.init(
-    api_key=os.environ["HH_API_KEY"],
-    project="New Project",
-    source="dev",
-    session_name="RAG Session"
-)
-
+# Initialize clients
 openai_client = OpenAI()
 pc = Pinecone()
 index = pc.Index("chunk-size-512")
@@ -26,28 +14,11 @@ def embed_query(query):
     query_vector = res.data[0].embedding
     return query_vector
 
-# add a decorator on intermediate step
-@trace(
-    config={
-        "embedding_model": "text-embedding-ada-002",
-        "top_k": 3
-    }
-)
 def get_relevant_documents(query):
     query_vector = embed_query(query)
     res = index.query(vector=query_vector, top_k=3, include_metadata=True)
     return [item['metadata']['_node_content'] for item in res['matches']]
 
-# add a decorator on intermediate step
-@trace(
-    config={
-        "model": "gpt-4o-mini",
-        "prompt": "You are a helpful assistant" 
-    },
-    metadata={
-        "version": 1
-    }
-)
 def generate_response(context, query):
     prompt = f"Context: {context}\n\nQuestion: {query}\n\nAnswer:"
     response = openai_client.chat.completions.create(
@@ -59,8 +30,6 @@ def generate_response(context, query):
     )
     return response.choices[0].message.content
 
-# add decorator on main logical step
-@trace()
 def rag_pipeline(query):
     docs = get_relevant_documents(query)
     response = generate_response("\n".join(docs), query)
@@ -71,17 +40,6 @@ def main():
     response = rag_pipeline(query)
     print(f"Query: {query}")
     print(f"Response: {response}")
-    
-    HoneyHiveTracer.set_metadata({
-        "experiment-id": 123
-    })
-    
-    # Simulate getting user feedback
-    user_rating = 4
-    HoneyHiveTracer.set_feedback({
-        "rating": user_rating,
-        "comment": "The response was accurate and helpful."
-    })
 
 if __name__ == "__main__":
     main()
