@@ -35,11 +35,11 @@ This directory contains a script demonstrating how to implement observability in
    PINECONE_API_KEY=your-pinecone-api-key
    HONEYHIVE_API_KEY=your-honeyhive-api-key
    HONEYHIVE_PROJECT=your-honeyhive-project-name
-   PINECONE_INDEX_NAME=your-index-name
    ```
 
 5. Update the script to use environment variables:
    - In `observability_tutorial.py`, replace the hardcoded API keys and project names with `os.getenv()` calls.
+   - Replace `your-index-name` with the name of your Pinecone index.
 
 ## Usage
 
