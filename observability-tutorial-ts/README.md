@@ -14,7 +14,7 @@ This directory contains a TypeScript script demonstrating how to implement obser
 
 1. Clone this repository:
    ```
-   git clone https://github.com/your-repo/observability-tutorial-ts
+   git clone https://github.com/honeyhiveai/cookbook
    cd observability-tutorial-ts
    ```
 
