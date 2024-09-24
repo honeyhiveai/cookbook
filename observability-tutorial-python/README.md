@@ -29,11 +29,17 @@ This directory contains a script demonstrating how to implement observability in
    pip install -r requirements.txt
    ```
 
-4. Update the API keys and project name in `observability_tutorial.py`:
-   - Replace `your-honeyhive-api-key` with your HoneyHive API key
-   - Replace `your-honeyhive-project-name` with your HoneyHive project name
-   - Replace `your-index-name` with your Pinecone index name
-   - Uncomment and update the OpenAI and Pinecone API key environment variables
+4. Create a `.env` file in the project root and add your API keys:
+   ```
+   OPENAI_API_KEY=your-openai-api-key
+   PINECONE_API_KEY=your-pinecone-api-key
+   HONEYHIVE_API_KEY=your-honeyhive-api-key
+   HONEYHIVE_PROJECT=your-honeyhive-project-name
+   PINECONE_INDEX_NAME=your-index-name
+   ```
+
+5. Update the script to use environment variables:
+   - In `observability_tutorial.py`, replace the hardcoded API keys and project names with `os.getenv()` calls.
 
 ## Usage
 
@@ -41,6 +47,22 @@ Run the script:
 ```
 python observability_tutorial.py
 ```
+
+## Docker Support (Optional)
+
+If you prefer to use Docker, follow these steps:
+
+1. Build the Docker image:
+   ```
+   docker build -t observability-tutorial-python .
+   ```
+
+2. Run the Docker container:
+   ```
+   docker run --env-file .env observability-tutorial-python
+   ```
+
+This will run the application inside a Docker container, using the environment variables from your `.env` file.
 
 ## How It Works
 
@@ -59,7 +81,9 @@ The script uses OpenAI's API for embeddings and text generation, Pinecone for ve
 
 - `observability_tutorial.py`: The main Python script demonstrating the RAG pipeline with observability
 - `README.md`: This file, containing instructions and explanations
-- `requirements.txt`: File containing package requirements (not shown in the provided snippets)
+- `requirements.txt`: File containing package requirements
+- `Dockerfile`: Configuration file for building a Docker image (if using Docker)
+- `.env`: File for storing environment variables (not included in repository)
 
 ## Notes
 
@@ -67,3 +91,13 @@ The script uses OpenAI's API for embeddings and text generation, Pinecone for ve
 - The script uses OpenAI's "text-embedding-ada-002" for embeddings and "gpt-4o" for text generation. Adjust these if needed.
 - The Pinecone index should be set up beforehand with appropriate data for the RAG pipeline to work effectively.
 - Observability data will be available in your HoneyHive project for analysis and evaluation.
+
+## Dependencies
+
+The main dependencies for this project are:
+
+- `openai`: For OpenAI API interactions
+- `pinecone`: For vector database operations
+- `honeyhive`: For observability and tracing
+
+Refer to `requirements.txt` for the complete list of dependencies and their versions.

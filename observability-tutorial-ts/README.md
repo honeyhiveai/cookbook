@@ -41,6 +41,22 @@ Run the script:
 npm start
 ```
 
+## Docker Support (Optional)
+
+If you prefer to use Docker, follow these steps:
+
+1. Build the Docker image:
+   ```
+   docker build -t observability-tutorial-ts .
+   ```
+
+2. Run the Docker container:
+   ```
+   docker run --env-file .env observability-tutorial-ts
+   ```
+
+This will run the application inside a Docker container, using the environment variables from your `.env` file.
+
 ## How It Works
 
 This script demonstrates a RAG pipeline with observability using HoneyHive. Here's a breakdown of what the script does:
@@ -60,6 +76,7 @@ The script uses OpenAI's API for embeddings and text generation, Pinecone for ve
 - `package.json`: Node.js package configuration file
 - `README.md`: This file, containing instructions and explanations
 - `.env`: File for storing environment variables (not included in repository)
+- `Dockerfile`: Configuration file for building a Docker image (if using Docker)
 
 ## Notes
 
