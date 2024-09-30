@@ -1,5 +1,6 @@
 import { HoneyHive } from "honeyhive";
 import { CreateEventRequestEventType, CreateEventRequest } from "honeyhive/models/components";
+import { v4 as uuidv4 } from 'uuid';
 
 const hhai = new HoneyHive({
     bearerAuth: process.env.HH_API_KEY,
@@ -16,15 +17,19 @@ const runId = evalRun.runId;
 
 // log your sessions
 for (let i = 0; i < 5; i++) {
+
+    const sessionId = uuidv4();
+
     const events: CreateEventRequest[] = [
         {
-            project: "Simple RAG",
+            project: process.env.HH_PROJECT || "",
             source: "playground",
             eventName: "Model Completion",
             eventType: CreateEventRequestEventType.Model,
             config: {},
             inputs: {},
-            duration: 0
+            duration: 0,
+            sessionId: sessionId
         }
     ];
 
@@ -32,11 +37,10 @@ for (let i = 0; i < 5; i++) {
         events: events
     });
 
-    const sessionId = batchLogRes.sessionId;
-
+    await new Promise(resolve => setTimeout(resolve, 5000));
     // add the session to the evaluation
     const updateRes = await hhai.events.updateEvent({
-        eventId: sessionId || "",
+        eventId: sessionId,
         metadata: {
             "run_id": runId
         }
