@@ -1,0 +1,19 @@
+{
+    "name": "evaluation-tutorial-ts",
+    "version": "1.0.0",
+    "description": "Evaluation tutorial using TypeScript",
+    "main": "tutorial.ts",
+    "type": "module",
+    "scripts": {
+      "start": "npx tsx tutorial.ts"
+    },
+    "dependencies": {
+      "honeyhive": "^1.0.6"
+    },
+    "devDependencies": {
+      "@types/node": "^20.0.0",
+      "tsx": "^4.0.0",
+      "typescript": "^5.0.0"
+    }
+  }
+  
