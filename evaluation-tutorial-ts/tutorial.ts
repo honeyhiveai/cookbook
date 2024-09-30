@@ -1,5 +1,5 @@
 import { HoneyHive } from "honeyhive";
-import { CreateEventRequestEventType } from "honeyhive/models/components";
+import { CreateEventRequestEventType, CreateEventRequest } from "honeyhive/models/components";
 
 const hhai = new HoneyHive({
     bearerAuth: process.env.HH_API_KEY,
@@ -16,12 +16,15 @@ const runId = evalRun.runId;
 
 // log your sessions
 for (let i = 0; i < 5; i++) {
-    const events = [
+    const events: CreateEventRequest[] = [
         {
             project: "Simple RAG",
             source: "playground",
             eventName: "Model Completion",
             eventType: CreateEventRequestEventType.Model,
+            config: {},
+            inputs: {},
+            duration: 0
         }
     ];
 
