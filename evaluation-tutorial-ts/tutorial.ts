@@ -15,7 +15,7 @@ const evalRun = await hhai.runs.createRun({
 const runId = evalRun.runId;
 
 // log your sessions
-for (const session of sessions) {
+for (let i = 0; i < 5; i++) {
     const events = [
         {
             project: "Simple RAG",
