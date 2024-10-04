@@ -5,6 +5,9 @@ from langchain.vectorstores import FAISS
 from langchain.embeddings import OpenAIEmbeddings
 from langchain.chains import RetrievalQA
 from langchain.llms import OpenAI
+from honeyhive import HoneyHiveTracer
+
+HoneyHiveTracer.init(api_key=os.environ["HH_API_KEY"], project=os.environ["HH_PROJECT"])
 
 # Load the document
 loader = TextLoader('state_of_the_union.txt')

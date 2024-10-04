@@ -6,9 +6,16 @@ import { RecursiveCharacterTextSplitter } from 'langchain/text_splitter';
 import { OpenAIEmbeddings } from "@langchain/openai";
 import { FaissStore } from "@langchain/community/vectorstores/faiss";
 import { RetrievalQAChain } from 'langchain/chains';
+import { HoneyHiveLangChainTracer } from 'honeyhive';
 
 // Async function to run the QA system
 async function runQA() {
+  const tracer = new HoneyHiveLangChainTracer({
+    project: process.env.HH_PROJECT,
+    sessionName: 'langchain-js-sotu-rag',
+    apiKey: process.env.HH_API_KEY,
+  });
+
   // Load the document
   const loader = new TextLoader('state_of_the_union.txt');
   const documents = await loader.load();
@@ -37,7 +44,7 @@ async function runQA() {
 
   // Ask a question
   const query = "What did the president say about Ketanji Brown Jackson?";
-  const res = await qaChain.call({ query });
+  const res = await qaChain.call({ query, callbacks: [tracer] });
 
   console.log(res.text);
 }
