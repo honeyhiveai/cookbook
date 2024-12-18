@@ -1,31 +1,24 @@
-import { openai } from '@ai-sdk/openai';
 import { streamText } from 'ai';
-import { HoneyHiveTracer } from "honeyhive";
-
-async function initializeTracer(sessionName: string): Promise<HoneyHiveTracer> {
-  const tracer = await HoneyHiveTracer.init({
-      apiKey: process.env.HH_API_KEY!,
-      project: process.env.HH_PROJECT!,
-      sessionName: sessionName,
-  });
-
-  return tracer;
-}
-
-// Allow streaming responses up to 30 seconds
-export const maxDuration = 30;
+import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 
 export async function POST(req: Request) {
-  const { messages } = await req.json();
+  const { messages, sessionId } = await req.json();
 
-  const tracer = await initializeTracer('nextjs-ai-app');
-
+  const openrouter = createOpenRouter({
+    apiKey: process.env.OPENROUTER_API_KEY,
+  });
+  
   const result = streamText({
-    model: openai('gpt-4o-mini'),
+    model: openrouter('openai/gpt-4o-2024-11-20'),
     messages,
     experimental_telemetry: {
       isEnabled: true,
-      tracer: tracer.getTracer(),
+      metadata: {
+        sessionId,
+        sessionName: 'chat-session',
+        project: 'my-honehyhive-project-name', // not needed if set in environment variable
+        source: 'dev',
+      },
     },
   });
 
