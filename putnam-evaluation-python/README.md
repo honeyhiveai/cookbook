@@ -37,7 +37,7 @@ Open your terminal (or command prompt) and run the following commands:
 
 ```bash
 git clone https://github.com/honeyhiveai/cookbook
-cd putnam-2023-ai-eval
+cd putnam-evaluation-python
 ```
 
 ## 3. Setup Python Environment
