@@ -1,102 +1,133 @@
 import os
-import json
 from openai import OpenAI
-from honeyhive.tracer import HoneyHiveTracer
-from honeyhive.tracer.custom import trace
-import honeyhive
-from honeyhive.models import components
+from honeyhive import evaluate, enrich_span, evaluator, trace
 
-# Initialize HoneyHive client
-hhai = honeyhive.HoneyHive(
-    bearer_auth="YOUR_HONEYHIVE_API_KEY",  # <<<< REPLACE WITH YOUR HONEYHIVE API KEY >>>>
-)
-
-# Set up OpenAI API key
-OPENAI_API_KEY = 'YOUR_OPENAI_API_KEY'  # <<<< REPLACE WITH YOUR OPENAI API KEY >>>>
+# ---------------------------------------------------------------------------
+# SETUP API KEYS
+# ---------------------------------------------------------------------------
+# Replace 'YOUR_OPENAI_API_KEY' with your actual OpenAI API key.
+OPENAI_API_KEY = 'YOUR_OPENAI_API_KEY'
 os.environ["OPENAI_API_KEY"] = OPENAI_API_KEY
 
-# Initialize OpenAI client
+# Initialize the OpenAI client using the provided API key.
 openai_client = OpenAI(api_key=OPENAI_API_KEY)
 
-# Create a HoneyHive run for this evaluation
-eval_run = hhai.runs.create_run(request=components.CreateRunRequest(
-    project='YOUR_HONEYHIVE_PROJECT_NAME',  # <<<< REPLACE WITH YOUR HONEYHIVE PROJECT NAME >>>>
-    name='o1-preview-eval',
-    event_ids=[],
-))
-
-run_id = eval_run.create_run_response.run_id
-
-# Function to load JSONL file
-def load_jsonl(file_path):
-    with open(file_path, 'r') as file:
-        return [json.loads(line) for line in file]
-
-# Load Putnam questions
-script_path = os.path.abspath(__file__)
-script_dir = os.path.dirname(script_path)
-json_path = os.path.join(script_dir, 'putnam_2023.jsonl')
-putnam_questions = load_jsonl(json_path)
-
-# Function to generate response using OpenAI API
-@trace()
-def generate_response(question, ground_truth):
+# ---------------------------------------------------------------------------
+# DEFINE THE RESPONSE GENERATION FUNCTION
+# ---------------------------------------------------------------------------
+@trace(
+    config={
+        "model": "o3-mini",  # Optionally specify the model used for generating responses.
+        "provider": "OpenAI",  # Optionally indicate the provider.
+    }
+)
+def generate_response(question, id, category, ground_truth):
+    """
+    This function takes a question and associated metadata, sends the prompt
+    to the OpenAI model, and returns the generated response.
+    """
     completion = openai_client.chat.completions.create(
-        model="o1-preview",
+        model="o3-mini",
         messages=[
-            {"role": "user", "content": question}
+            {"role": "user", "content": question}  # Send the question as the user's message.
         ]
     )
+    # Use HoneyHive to add metadata and ground truth feedback to this span.
+    enrich_span(metadata={"question_id": id, "category": category},
+                feedback={"ground_truth": ground_truth})
     return completion.choices[0].message.content
 
-# Function to process each question
-@trace()
-def process_question(question, ground_truth, question_id, category):
-    result = generate_response(question, ground_truth)
-    print(f"Question ID: {question_id}")
-    print(f"Query: {question}")
-    print(f"Response: {result}")
-    print(f"Category: {category}")
-    print("---")
-    return result
-
-# Main execution
-if __name__ == "__main__":
-    event_ids_eval = []
-
-    for question_data in putnam_questions:
-        # Initialize HoneyHive tracer for each question
-        HoneyHiveTracer.init(
-            api_key='YOUR_HONEYHIVE_API_KEY',  # <<<< REPLACE WITH YOUR HONEYHIVE API KEY >>>>
-            project='YOUR_HONEYHIVE_PROJECT_NAME',  # <<<< REPLACE WITH YOUR HONEYHIVE PROJECT NAME >>>>
-            source='evaluation',
-            session_name=f'Putnam Q&A OpenAI - Question {question_data["question_id"]}'
-        )
-
-        # Set metadata for the current question
-        HoneyHiveTracer.set_metadata({
-            "run_id": run_id,
-            "question_id": question_data["question_id"],
-            "question": question_data["question"],
-            "category": question_data["question_category"]
-        })
-
-        # Process the question
-        process_question(
-            question_data["question"], 
-            question_data["solution"], 
-            question_data["question_id"],
-            question_data["question_category"]
-        )
-        event_ids_eval.append(HoneyHiveTracer.session_id)
-
-    # Update the HoneyHive run with results
-    hhai.runs.update_run(
-        run_id,
-        components.UpdateRunRequest(
-            event_ids=event_ids_eval,
-            status=components.UpdateRunRequestStatus.COMPLETED
-        )
+# ---------------------------------------------------------------------------
+# DEFINE THE MAIN QA FUNCTION
+# ---------------------------------------------------------------------------
+def putnam_qa(inputs, ground_truth):
+    """
+    This function acts as the entry point for evaluating a Putnam question.
+    It extracts the necessary details from the inputs and ground truth,
+    then calls the generate_response function.
+    
+    Parameters:
+      - inputs: dict containing question details.
+      - ground_truth: dict containing the correct solution.
+    """
+    return generate_response(
+        question=inputs['question'],
+        id=inputs['question_id'],
+        category=inputs['question_category'],
+        ground_truth=ground_truth['solution']
     )
 
+# ---------------------------------------------------------------------------
+# DEFINE THE RESPONSE QUALITY EVALUATOR
+# ---------------------------------------------------------------------------
+@evaluator()
+def response_quality_evaluator(outputs, inputs, ground_truths):
+    """
+    This evaluator function uses a grading prompt to assess the quality
+    of the AI-generated response against the ground truth.
+    
+    It sends the prompt to the OpenAI model (configured with a different model)
+    and extracts a rating between 0 and 10.
+    """
+    import re  # Regular expressions used for parsing the rating.
+
+    # Construct the LLM evaluator prompt with detailed instructions and evaluation criteria.
+    grading_prompt = f"""
+[Instruction]
+Please act as an impartial judge and evaluate the quality of the response provided by an AI assistant to the user question displayed below. Your evaluation should consider the mentioned criteria. Begin your evaluation by providing a short explanation on how the answer performs on the evaluation criteria. Be as objective as possible. After providing your explanation, you must rate the response on a scale of 0 to 10 by strictly following this format: "Rating: [[<number>]]".
+
+[Criteria]
+Each solution is worth 10 points. The grading should be strict and meticulous, reflecting the advanced level of the Putnam Competition:
+- 10 points: A complete, rigorous, and elegant solution with no errors or omissions.
+- 9 points: A correct and complete solution with minor presentation issues.
+- 7-8 points: Essentially correct but with minor gaps.
+- 5-6 points: Significant progress is made but with substantial gaps or errors.
+- 3-4 points: Some relevant progress but major parts are missing or incorrect.
+- 1-2 points: Only the beginnings of a solution are present.
+- 0 points: No significant progress is made.
+
+Question: {inputs}
+
+[The Start of AI Proof]
+{outputs}
+[The End of AI Proof]
+
+[The Start of Ground Truth Proof]
+{ground_truths.get("solution", "N/A")}
+[The End of Ground Truth Proof]
+
+[Evaluation With Rating]
+"""
+
+    # Send the grading prompt to another OpenAI model (here "o3-mini") for evaluation.
+    completion = openai_client.chat.completions.create(
+        model="o3-mini",
+        messages=[{"role": "user", "content": grading_prompt}]
+    )
+    # Retrieve the evaluation text from the model's response.
+    evaluation_text = completion.choices[0].message.content
+
+    # Use regex to extract the rating formatted as "Rating: [[<number>]]"
+    match = re.search(r"Rating:\s*\[\[(\d+)\]\]", evaluation_text)
+    if match:
+        score = int(match.group(1))
+        explanation = evaluation_text[:match.start()].strip()
+    else:
+        score = 0
+        explanation = evaluation_text.strip()
+    # Return the extracted score.
+    return score
+
+# ---------------------------------------------------------------------------
+# RUN THE EVALUATION
+# ---------------------------------------------------------------------------
+if __name__ == "__main__":
+    evaluate(
+        function=putnam_qa,  # The main function that you're evaluating.
+        hh_api_key='YOUR_HONEYHIVE_API_KEY',  # Replace with your HoneyHive API key.
+        hh_project='YOUR_HONEYHIVE_PROJECT_NAME',  # Replace with your HoneyHive project name.
+        name='Putnam Q&A Eval', # Optionally replace the experiment name
+        dataset_id='YOUR_HONEYHIVE_DATASET_ID',  # Replace with your dataset ID.
+        evaluators=[response_quality_evaluator]  # List of evaluator functions defined in your code.
+    )
     print("Putnam evaluation completed and pushed to HoneyHive.")

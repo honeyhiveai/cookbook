@@ -1,98 +1,141 @@
-# Putnam 2023 AI Evaluation Tutorial (Python)
+# Evaluating Advanced Reasoning Models on Putnam 2023
 
-This directory contains a script for evaluating AI models on the Putnam 2023 Mathematical Competition questions using OpenAI's API and HoneyHive for observability.
+This tutorial will guide you through setting up and running an AI evaluation for Putnam 2023 competition questions using OpenAI's API and HoneyHive. The William Lowell Putnam Mathematical Competition is the preeminent mathematics competition for undergraduate college students in North America, known for its exceptionally challenging problems that test deep mathematical thinking and rigorous proof writing abilities.
 
-## Prerequisites
+This evaluation is particularly significant as it allows us to assess how well advanced language models like OpenAI's `o3-mini` or Deepseek's `R1` can handle complex mathematical reasoning and proof generation. The Putnam competition serves as an excellent benchmark due to its consistent difficulty level and requirement for both creative problem-solving and formal mathematical rigor. By evaluating model performance on these problems, we can better understand the current capabilities and limitations of AI systems in advanced mathematical reasoning.
 
-- Python 3.10+
-- OpenAI API key
-- HoneyHive API key
-- HoneyHive project and custom evaluator set up
+---
 
-## Setup
+## Table of Contents
 
-1. Clone this repository:
-   ```
-   git clone https://github.com/honeyhiveai/cookbook
-   cd putnam-2023-ai-eval
-   ```
+1. [Prerequisites](#prerequisites)
+2. [Clone the Repository](#clone-the-repository)
+3. [Setup Python Environment](#setup-python-environment)
+4. [Install Required Packages](#install-required-packages)
+5. [Configure API Keys and Project Settings](#configure-api-keys-and-project-settings)
+6. [Prepare the Dataset](#prepare-the-dataset)
+7. [Run the Evaluation](#run-the-evaluation)
+8. [Reviewing the Results](#reviewing-the-results)
+9. [Additional Notes](#additional-notes)
 
-2. Create a Python virtual environment:
-   ```
-   python -m venv putnam_eval_env
-   source putnam_eval_env/bin/activate  # On Windows use `putnam_eval_env\Scripts\activate`
-   ```
+---
 
-3. Install the required packages:
-   ```
-   pip install -r requirements.txt
-   ```
+## 1. Prerequisites
 
-4. Update the API keys and project name in `putnam_eval_script.py`:
-   - Replace `YOUR_HONEYHIVE_API_KEY` with your HoneyHive API key
-   - Replace `YOUR_OPENAI_API_KEY` with your OpenAI API key
-   - Replace `YOUR_HONEYHIVE_PROJECT_NAME` with your HoneyHive project name
+Before you begin, make sure you have:
 
-5. Ensure you have the `putnam_2023.jsonl` file in the same directory as the script. This file should contain the Putnam 2023 questions and solutions.
+- **Python 3.10+** installed.
+- An **OpenAI API key**. ([Get one here](https://platform.openai.com/account/api-keys))
+- A **HoneyHive API key**, along with your **HoneyHive project name** and **dataset ID**.
+- The Putnam 2023 questions and solutions in a JSONL file (e.g., `putnam_2023.jsonl`).
 
-6. Set up a custom LLM evaluator in HoneyHive:
-   - Follow the instructions in the [HoneyHive documentation](https://docs.honeyhive.ai/evaluators/llm) to set up a custom LLM evaluator.
-   - Configure the evaluator to trigger on the `process_question` event.
-   - Use the following prompt template for the evaluator:
+---
 
-     ```
-     [Instruction]
-     Please act as an impartial judge and evaluate the quality of the response provided by an AI assistant to the user question displayed below. Your evaluation should consider the mentioned criteria. Begin your evaluation by providing a short explanation on how the answer performs on the evaluation criteria. Be as objective as possible. After providing your explanation, you must rate the response on a scale of 0 to 10 by strictly following this format: "[[rating]]", for example: "Rating: [[7]]".
-     [Criteria]
-     Each solution is worth 10 points. The grading should be strict and meticulous, reflecting the advanced level of the Putnam Competition:
-     10 points: A complete, rigorous, and elegant solution with no errors or omissions. The proof is clear, concise, and demonstrates a deep understanding of the mathematical concepts involved.
-     9 points: A correct and complete solution with minor presentation issues or slight inefficiencies. All key ideas are present and properly justified.
-     7-8 points: A solution that is essentially correct but may have one or more minor gaps, imprecisions in reasoning, or areas where more elaboration is needed. The main approach is valid.
-     5-6 points: A significant amount of progress is made, with the key ideas present, but there are more substantial gaps or errors in the reasoning. The solution is on the right track but incomplete.
-     3-4 points: Some relevant progress is made, and some key insights are present, but major parts of the solution are missing or incorrect. The approach shows promise but falls short of a complete solution.
-     1-2 points: The beginnings of a solution are present. There's evidence of understanding some aspects of the problem, but the majority of the necessary work is either missing or incorrect.
-     0 points: No significant progress is made towards a solution, or the work presented is entirely off-track or irrelevant to the problem.
-     Question: {{ inputs._params_.question }}
-     [The Start of AI Proof]
-     {{ outputs.result }}
-     [The End of AI Proof]
-     [The Start of Ground Truth Proof]
-     {{ inputs._params_.ground_truth }}
-     [The End of Ground Truth Proof]
-     [Evaluation With Rating]
-     ```
+## 2. Clone the Repository
 
-## Usage
+Open your terminal (or command prompt) and run the following commands:
 
-Run the script:
+```bash
+git clone https://github.com/honeyhiveai/cookbook
+cd putnam-2023-ai-eval
 ```
+
+## 3. Setup Python Environment
+
+Create and activate a virtual environment to keep your dependencies isolated:
+
+```bash
+# Create a virtual environment
+python -m venv putnam_eval_env
+
+# On macOS/Linux:
+source putnam_eval_env/bin/activate
+
+# On Windows:
+putnam_eval_env\Scripts\activate
+```
+
+## 4. Install Required Packages
+
+Install the necessary Python packages using the provided requirements.txt:
+
+```bash
+pip install -r requirements.txt
+```
+
+## 5. Configure API Keys and Project Settings
+
+Open the putnam_eval.py script in your preferred text editor and update the following:
+
+### Update OpenAI API Key
+
+Replace 'YOUR_OPENAI_API_KEY' with your actual OpenAI API key in the script:
+
+```python
+# Set your OpenAI API key (anonymized in this example)
+OPENAI_API_KEY = 'YOUR_OPENAI_API_KEY'
+os.environ["OPENAI_API_KEY"] = OPENAI_API_KEY
+```
+
+### Update HoneyHive Configuration
+
+In the if __name__ == "__main__": block at the bottom of the script, replace the placeholders with your HoneyHive credentials:
+
+```python
+if __name__ == "__main__":
+    evaluate(
+        function=putnam_qa,  # The main function to generate responses.
+        hh_api_key='YOUR_HONEYHIVE_API_KEY',          # Replace with your HoneyHive API key.
+        hh_project='YOUR_HONEYHIVE_PROJECT_NAME',       # Replace with your HoneyHive project name.
+        dataset_id='YOUR_HONEYHIVE_DATASET_ID',         # Replace with your dataset ID.
+        evaluators=[response_quality_evaluator]
+    )
+    print("Putnam evaluation completed and pushed to HoneyHive.")
+```
+
+**Important**: Keep your API keys confidential. Do not commit them to version control.
+
+## 6. Prepare the Dataset
+
+Upload your Putnam 2023 dataset to HoneyHive by following the guide at [https://docs.honeyhive.ai/datasets/import](https://docs.honeyhive.ai/datasets/import). The dataset should be in JSONL format containing the Putnam questions and their corresponding solutions.
+
+## 7. Run the Evaluation
+
+With everything configured, run the evaluation script from your terminal:
+
+```bash
 python putnam_eval.py
 ```
 
-## How It Works
+The script will:
+- Load each question from your dataset.
+- Generate a response using the OpenAI model.
+- Trace and log metadata to HoneyHive.
+- Evaluate the response quality using the built-in evaluator.
 
-This script evaluates AI models (specifically OpenAI's o1-preview) on the Putnam 2023 Mathematical Competition questions. It uses HoneyHive for observability and tracking. Here's a breakdown of what the script does:
+After running, you should see a confirmation message indicating that the evaluation has been pushed to HoneyHive.
 
-1. Imports necessary libraries and sets up API keys
-2. Creates a HoneyHive run for the evaluation
-3. Loads the Putnam 2023 questions from a JSONL file
-4. Defines functions to generate responses and process questions
-5. Iterates through each question, sending it to the AI model and logging the results
-6. Updates the HoneyHive run with the evaluation results
+## 8. Reviewing the Results
 
-The script uses OpenAI's API to generate responses and HoneyHive's tracing functionality to log and analyze the results. This allows for detailed evaluation of the AI model's performance on complex mathematical problems.
+To review the evaluation results:
 
-The custom LLM evaluator set up in HoneyHive provides an impartial assessment of each AI-generated solution, grading it on a scale of 0 to 10 based on the Putnam Competition's rigorous standards.
+### Log into your HoneyHive Dashboard:
+Go to HoneyHive and sign in.
 
-## File Structure
+### Navigate to the Evaluations Tab:
+In your project, click on the `Experiments` tab to view the detailed traces and evaluation scores for each question.
 
-- `putnam_eval.py`: The main Python script for running the evaluation
-- `putnam_2023.jsonl`: JSONL file containing Putnam 2023 questions and solutions (not included in repo, must be provided)
-- `README.md`: This file, containing instructions and explanations
-- `requirements.txt`: File containing package requirements
+## 9. Additional Notes
 
-## Notes
+### Security:
+Always keep your API keys secure. Avoid sharing or committing them to public repositories.
 
-- Make sure to keep your API keys confidential and do not commit them to version control.
-- The script is set up to use the "o1-preview" model from OpenAI. Adjust this if you want to evaluate different models.
-- The evaluation results will be available in your HoneyHive project under the `Evaluations` tab.
+### Model Adjustments:
+The script currently uses OpenAI's `o3-mini` model for generating responses and the "o3-mini" model for model-graded evaluation. Adjust these model names if necessary to suit your needs or available models. The choice of o3-mini for evaluation is particularly important as it represents one of the most advanced models for mathematical reasoning, making it well-suited for assessing solutions to complex Putnam problems.
+
+### Customization:
+You can modify the evaluation criteria or grading prompt in the script to better align with your specific evaluation standards. The current evaluation system is designed to mirror the rigorous grading standards of the actual Putnam Competition, where partial credit is awarded based on the completeness and correctness of the mathematical reasoning demonstrated.
+
+By following these steps, you will have a fully functional evaluation system for Putnam competition questions integrated with HoneyHive's observability platform. This setup allows you to systematically assess how well AI models can handle some of the most challenging undergraduate mathematics problems, providing valuable insights into their mathematical reasoning capabilities. If you encounter any issues, please refer to the HoneyHive documentation or reach out to their support for further assistance.
+
+Happy Evaluating!
