@@ -2,7 +2,7 @@ import os
 from openai import OpenAI
 from pinecone import Pinecone
 
-from honeyhive.tracer import HoneyHiveTracer
+from honeyhive import HoneyHiveTracer
 from honeyhive.tracer.custom import trace
 
 # Set up environment variables
@@ -10,7 +10,7 @@ from honeyhive.tracer.custom import trace
 # os.environ["PINECONE_API_KEY"] = "your-pinecone-api-key"
 
 # Initialize HoneyHive Tracer
-HoneyHiveTracer.init(
+tracer = HoneyHiveTracer.init(
     api_key="your-honeyhive-api-key",
     project="your-honeyhive-project-name",
     source="dev",
@@ -72,17 +72,12 @@ def main():
     response = rag_pipeline(query)
     print(f"Query: {query}")
     print(f"Response: {response}")
-    
-    HoneyHiveTracer.set_metadata({
-        "experiment-id": 123
-    })
+    tracer.enrich_session(metadata={"experiment-id": 123})
     
     # Simulate getting user feedback
     user_rating = 4
-    HoneyHiveTracer.set_feedback({
-        "rating": user_rating,
-        "comment": "The response was accurate and helpful."
-    })
+    tracer.enrich_session(feedback={"rating": user_rating,
+                                    "comment": "The response was accurate and helpful."})
 
 if __name__ == "__main__":
     main()
