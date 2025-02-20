@@ -1,6 +1,7 @@
 import os
-from openai import OpenAI
-from honeyhive import evaluate, enrich_span, evaluator, trace
+import asyncio
+from openai import AsyncOpenAI, OpenAI
+from honeyhive import evaluate, enrich_span, evaluator, atrace
 
 # ---------------------------------------------------------------------------
 # SETUP API KEYS
@@ -9,24 +10,27 @@ from honeyhive import evaluate, enrich_span, evaluator, trace
 OPENAI_API_KEY = 'YOUR_OPENAI_API_KEY'
 os.environ["OPENAI_API_KEY"] = OPENAI_API_KEY
 
-# Initialize the OpenAI client using the provided API key.
-openai_client = OpenAI(api_key=OPENAI_API_KEY)
+# DO NOT DO THIS
+# Since we run evaluations concurrently, passing a global reference to the AsyncOpenAI client
+# will result in all evaluations using the same client across threads and event loops.
+# This will lead to asyncio related errors.
+# openai_client = AsyncOpenAI(api_key=OPENAI_API_KEY)
 
 # ---------------------------------------------------------------------------
 # DEFINE THE RESPONSE GENERATION FUNCTION
 # ---------------------------------------------------------------------------
-@trace(
+@atrace(
     config={
         "model": "o3-mini",  # Optionally specify the model used for generating responses.
         "provider": "OpenAI",  # Optionally indicate the provider.
     }
 )
-def generate_response(question, id, category, ground_truth):
+async def generate_response(question, id, category, ground_truth):
     """
     This function takes a question and associated metadata, sends the prompt
     to the OpenAI model, and returns the generated response.
     """
-    completion = openai_client.chat.completions.create(
+    completion = await openai_client.chat.completions.create(
         model="o3-mini",
         messages=[
             {"role": "user", "content": question}  # Send the question as the user's message.
@@ -38,24 +42,39 @@ def generate_response(question, id, category, ground_truth):
     return completion.choices[0].message.content
 
 # ---------------------------------------------------------------------------
-# DEFINE THE MAIN QA FUNCTION
+# DEFINE THE MAIN FUNCTION
 # ---------------------------------------------------------------------------
-def putnam_qa(inputs, ground_truth):
+def evaluation_task(inputs, ground_truth):
     """
-    This function acts as the entry point for evaluating a Putnam question.
+    This function acts as the entry point for the evaluation.
     It extracts the necessary details from the inputs and ground truth,
-    then calls the generate_response function.
+    then calls the generate_response function using asyncio.run.
+
+    This function will run concurrently for each datapoint in the dataset,
+    have its own thread and isolated Python context, including its own asyncio event loop, 
+    and will not interfere with other evaluations.
+
+    This function may NOT be async and takes either 1 or 2 arguments.
+    If it takes 1 argument, it is the input dictionary.
+    If it takes 2 arguments, the first argument is the input dictionary
+    and the second argument is the ground truth dictionary.
     
     Parameters:
       - inputs: dict containing question details.
       - ground_truth: dict containing the correct solution.
     """
-    return generate_response(
+    
+    # Declare your globals inside the evaluation task function
+    # This ensures that each evaluation task thread gets its own instance of the AsyncOpenAI client
+    global openai_client
+    openai_client = AsyncOpenAI(api_key=OPENAI_API_KEY)
+
+    return asyncio.run(generate_response(
         question=inputs['question'],
         id=inputs['question_id'],
         category=inputs['question_category'],
         ground_truth=ground_truth['solution']
-    )
+    ))
 
 # ---------------------------------------------------------------------------
 # DEFINE THE RESPONSE QUALITY EVALUATOR
@@ -100,7 +119,8 @@ Question: {inputs}
 """
 
     # Send the grading prompt to another OpenAI model (here "o3-mini") for evaluation.
-    completion = openai_client.chat.completions.create(
+    client = OpenAI(api_key=OPENAI_API_KEY)
+    completion = client.chat.completions.create(
         model="o3-mini",
         messages=[{"role": "user", "content": grading_prompt}]
     )
@@ -123,11 +143,11 @@ Question: {inputs}
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
     evaluate(
-        function=putnam_qa,  # The main function that you're evaluating.
+        function=evaluation_task,  # The main function that you're evaluating.
         hh_api_key='YOUR_HONEYHIVE_API_KEY',  # Replace with your HoneyHive API key.
         hh_project='YOUR_HONEYHIVE_PROJECT_NAME',  # Replace with your HoneyHive project name.
         name='Putnam Q&A Eval', # Optionally replace the experiment name
         dataset_id='YOUR_HONEYHIVE_DATASET_ID',  # Replace with your dataset ID.
-        evaluators=[response_quality_evaluator]  # List of evaluator functions defined in your code.
+        evaluators=[response_quality_evaluator],  # List of evaluator functions defined in your code.
     )
     print("Putnam evaluation completed and pushed to HoneyHive.")
