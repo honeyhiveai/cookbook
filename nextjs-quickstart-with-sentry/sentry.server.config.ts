@@ -3,7 +3,7 @@
 // https://docs.sentry.io/platforms/javascript/guides/nextjs/
 
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto";
-import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-node";
+import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
 
 import * as Sentry from "@sentry/nextjs";
 
@@ -17,18 +17,20 @@ const client = Sentry.init({
     // new Sentry.fsIntegration(),
   ],
 
+  openTelemetrySpanProcessors: [
+    new BatchSpanProcessor(new OTLPTraceExporter(
+      {
+        url: process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
+        headers: {
+          "Authorization": `Bearer ${process.env.HH_API_KEY}`,
+          "x-honeyhive": `project:${process.env.HH_PROJECT_NAME}`,
+        },
+      }
+    )),
+  ],
+
   // Setting this option to true will print useful information to the console while you're setting up Sentry.
   debug: false,
-} as Sentry.NodeOptions) as Sentry.NodeClient;
+});
 
-client?.traceProvider?.addSpanProcessor(
-  new BatchSpanProcessor(new OTLPTraceExporter(
-    {
-      url: process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
-      headers: {
-        "Authorization": `Bearer ${process.env.HH_API_KEY}`,
-        "x-honeyhive": `project:${process.env.HH_PROJECT_NAME}`,
-      },
-    }
-  )),
-);
+
