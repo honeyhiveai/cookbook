@@ -112,6 +112,8 @@ The system follows this workflow:
 5. **Result Processing**: Formats and returns the execution results
 6. **Evaluation**: Assesses the performance using multiple metrics
 
+![Workflow](workflow.png)
+
 ## Customization
 
 ### Adding New Models
