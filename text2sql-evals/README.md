@@ -88,6 +88,19 @@ The framework uses three primary evaluators:
 2. **Has Results Evaluator**: Verifies if the query returned any results
 3. **SQL Validity Evaluator**: Uses an LLM to assess if the generated SQL is valid
 
+## Evaluation Results
+
+Below are the evaluation results for each LLM provider:
+
+### OpenAI (GPT-4o) Results
+![OpenAI Evaluation Results](openai_evals.png)
+
+### Google Gemini (gemini-2.0-flash) Results
+![Gemini Evaluation Results](gemini_evals.png)
+
+### Anthropic (Claude 3.7 Sonnet) Results
+![Anthropic Evaluation Results](anthropic_evals.png)
+
 ## Architecture
 
 The system follows this workflow:
@@ -98,6 +111,8 @@ The system follows this workflow:
 4. **Query Execution**: Runs the SQL against the NBA dataset using DuckDB
 5. **Result Processing**: Formats and returns the execution results
 6. **Evaluation**: Assesses the performance using multiple metrics
+
+![Workflow](workflow.png)
 
 ## Customization
 
