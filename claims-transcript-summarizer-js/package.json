@@ -1,0 +1,11 @@
+{
+  "name": "claims-transcript-summarizer-js",
+  "version": "1.0.0",
+  "description": "An application to summarize insurance call transcripts using Azure OpenAI",
+  "main": "transcriptsTrace.js",
+  "type": "module",
+  "dependencies": {
+    "honeyhive": "^1.0.21",
+    "openai": "^4.24.0"
+  }
+}
