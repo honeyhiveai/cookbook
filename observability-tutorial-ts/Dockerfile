@@ -13,8 +13,5 @@ RUN npm install
 # Copy the rest of the application code
 COPY . .
 
-# Compile TypeScript to JavaScript
-RUN npx tsc
-
 # Command to run the application
 CMD ["npm", "start"]
