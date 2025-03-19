@@ -99,16 +99,17 @@ async function main(): Promise<void> {
     console.log("Query", query);
     console.log("Response", response);
 
-    await tracer.enrichSession({metadata: {
-        "experiment-id": 1234
-    }});
 
     let userRating = 4;
-
-    await tracer.enrichSession({feedback: {
-        "rating": userRating,
-        "comment": "The response was accurate and helpful."
-    }});
+    await tracer.enrichSession({
+        feedback: {
+            "rating": userRating,
+            "comment": "The response was accurate and helpful."
+        },
+        metadata: {
+            "experiment-id": 1234
+        }
+    });
 }
 
 await tracer.trace(() => main())
