@@ -11,7 +11,7 @@ def init_honeyhive(update=False):
         st.session_state.tracer = HoneyHiveTracer.init(
             api_key=os.getenv('HONEYHIVE_API_KEY'),
             project=os.getenv('HONEYHIVE_PROJECT'),
-            session_name="Streamlit Session-11",
+            session_name="Streamlit Session",
             server_url=os.getenv('HONEYHIVE_SERVER_URL')
         )
     return st.session_state.tracer
