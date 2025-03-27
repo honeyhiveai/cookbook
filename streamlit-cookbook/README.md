@@ -75,7 +75,7 @@ def handle_feedback(feedback, session_id):
 ### Application Flow
 
 1. User enters a query in the text input field
-2. The app generates a response using OpenAI's GPT-3.5 Turbo
+2. The app generates a response using OpenAI's GPT-4o Mini
 3. The response is displayed along with feedback buttons
 4. User feedback is captured and sent to HoneyHive for tracking
 
