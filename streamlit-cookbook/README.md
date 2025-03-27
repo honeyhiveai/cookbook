@@ -31,7 +31,7 @@ pip install -r requirements.txt
 OPENAI_API_KEY=your_openai_api_key
 HONEYHIVE_API_KEY=your_honeyhive_api_key
 HONEYHIVE_PROJECT=your_project_name
-HONEYHIVE_SERVER_URL=https://app.honeyhive.ai
+HONEYHIVE_SERVER_URL=https://api.staging.honeyhive.ai
 ```
 
 ## Running the Application
@@ -42,7 +42,11 @@ To run the Streamlit app:
 streamlit run app.py
 ```
 
-This will start a local web server and open the application in your browser.
+This will start a local web server and open the application in your browser:
+
+![Streamlit App](images/streamlit.png)
+
+
 
 ## How It Works
 
