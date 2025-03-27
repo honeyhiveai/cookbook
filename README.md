@@ -27,6 +27,8 @@ This repository contains a collection of cookbooks and examples for integrating 
 | [llamaindex-python](./llamaindex-python) | Integration with LlamaIndex in Python |
 | [nextjs-quickstart](./nextjs-quickstart) | Basic Next.js integration with HoneyHive |
 | [nextjs-quickstart-with-sentry](./nextjs-quickstart-with-sentry) | Next.js integration with both HoneyHive and Sentry |
+| [streamlit](./streamlit-cookbook) | Basic streamlit integration with HoneyHive |
+
 
 ### 💼 Domain-Specific Evaluations
 
