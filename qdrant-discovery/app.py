@@ -219,14 +219,8 @@ def interpret_user_input_with_llm(
         logger.error(f"Error in LLM interpretation: {e}")
         return default_response
 
-@trace
-def run_agent():
-    """Runs the conversational quote recommendation agent."""
-    # --- State Variables ---
-    positive_embeddings: List[List[float]] = []
-    negative_embeddings: List[List[float]] = []
-    seen_quote_ids: Set[int] = set()  # Track quotes we've shown to avoid repeats
-    
+def _initialize_agent() -> Optional[Tuple[models.PointStruct, Set[int]]]:
+    """Initializes the agent state, prints welcome messages, and gets the first quote."""
     print("\n=== Motivational Quote Assistant ===")
     print("I'm here to help you discover motivational quotes that resonate with you!")
     print("You can tell me your preferences (e.g., 'I like stoic quotes, not romantic ones')")
@@ -235,96 +229,168 @@ def run_agent():
     print("\nLet's start with a random quote to get your initial feedback...")
     
     try:
-        # Get initial random quote
         initial_quote = get_random_quote()
         if not initial_quote:
             print("Sorry, I couldn't access the quote database. Please try again later.")
-            return
+            return None
             
-        current_quote = initial_quote
-        current_quote_text = current_quote.payload.get("quote", "Quote text not available.")
-        seen_quote_ids.add(current_quote.id)
+        seen_quote_ids: Set[int] = {initial_quote.id}
+        logger.info(f"Initialized with quote ID: {initial_quote.id}")
+        return initial_quote, seen_quote_ids
         
     except Exception as e:
         logger.error(f"Error getting initial quote: {e}")
-        print("Sorry, I encountered an error. Please try again later.")
-        return
+        print("Sorry, I encountered an error during initialization. Please try again later.")
+        return None
+
+def _handle_user_interaction(current_quote_text: str) -> Tuple[str, Dict]:
+    """Displays the current quote, gets user input, and returns the input and LLM interpretation."""
+    print(f"\nQuote: \"{current_quote_text}\"")
+    user_input = input("\nWhat do you think? (or type 'stop' to end): ").strip()
+    interpretation = interpret_user_input_with_llm(user_input, current_quote_text, num_examples=3)
+    return user_input, interpretation
+    
+def _update_embeddings_from_interpretation(
+    interpretation: Dict,
+    positive_embeddings: List[List[float]],
+    negative_embeddings: List[List[float]]
+):
+    """Updates positive and negative embedding lists based on LLM interpretation."""
+    if interpretation.get("positive_examples"):
+        print("\nProcessing positive feedback...")
+        for example in interpretation["positive_examples"]:
+            try:
+                embedding = get_embedding(example)
+                positive_embeddings.append(embedding)
+            except Exception as e:
+                logger.error(f"Error getting embedding for positive example: {e}")
+                continue
+    
+    if interpretation.get("negative_examples"):
+        print("\nProcessing negative feedback...")
+        for example in interpretation["negative_examples"]:
+            try:
+                embedding = get_embedding(example)
+                negative_embeddings.append(embedding)
+            except Exception as e:
+                logger.error(f"Error getting embedding for negative example: {e}")
+                continue
+
+def _get_next_quote(
+    positive_embeddings: List[List[float]],
+    negative_embeddings: List[List[float]],
+    seen_quote_ids: Set[int]
+) -> Optional[models.PointStruct]:
+    """Gets the next quote, either via context query or randomly, excluding seen quotes."""
+    try:
+        next_quote = None
+        if positive_embeddings or negative_embeddings: # Check if *any* embeddings exist
+            if positive_embeddings and negative_embeddings:
+                 # We have context pairs to use
+                print("\nSearching for quotes based on your feedback...")
+                context_pairs = create_context_pairs(positive_embeddings, negative_embeddings)
+                results = query_by_context(
+                    context_pairs=context_pairs,
+                    limit=5,
+                    exclude_ids=list(seen_quote_ids)
+                )
+            elif positive_embeddings:
+                # Only positive feedback available, use simple query
+                print("\nSearching for similar quotes...")
+                results = query_by_context(
+                    context_pairs=[models.ContextExamplePair(positive=pos, negative=None) for pos in positive_embeddings],
+                    limit=5,
+                    exclude_ids=list(seen_quote_ids)
+                )
+            else: # Only negative feedback available
+                print("\nTrying to find something different...")
+                # Use negative examples to find dissimilar items (less direct with context pairs)
+                # Could implement a negative-only query or fallback to random here.
+                # For simplicity, falling back to random if only negative exists.
+                results = [] # Force fallback to random if only negative
+
+            # Pick first unseen quote from results
+            for result in results:
+                if result.id not in seen_quote_ids:
+                    next_quote = result
+                    break
+                    
+            if not next_quote and results:
+                 print("\nFound similar quotes, but you've seen them all. Getting a random one.")
+            elif not next_quote:
+                print("\nCouldn't find a match based on feedback, getting a random quote.")
+
+        if not next_quote:
+            # If no context, not enough context, or context query failed/returned seen quotes
+            print("\nLet me find another quote for you...")
+            next_quote = get_random_quote(exclude_ids=list(seen_quote_ids))
+            if not next_quote: # Handle case where random retrieval also fails
+                print("Couldn't find any more quotes.")
+                return None
+                
+        return next_quote
+            
+    except Exception as e:
+        logger.error(f"Error getting next quote: {e}")
+        print("\nSorry, I encountered an error getting the next quote. Let's try again.")
+        return None # Indicate an error occurred
+
+
+@trace
+def run_agent():
+    """Runs the conversational quote recommendation agent."""
+    # --- Initialization ---
+    initialization_result = _initialize_agent()
+    if initialization_result is None:
+        return 0 # Indicate initialization failure
+
+    current_quote, seen_quote_ids = initialization_result
+    current_quote_text = current_quote.payload.get("quote", "Quote text not available.")
+    
+    # --- State Variables ---
+    positive_embeddings: List[List[float]] = []
+    negative_embeddings: List[List[float]] = []
     round_count = 0
+
     # --- Main Conversation Loop ---
     while True:
         round_count += 1
-        # Display current quote
-        logger.info(f"Displaying quote ID: {current_quote.id}")
-        print(f"\nQuote: \"{current_quote_text}\"")
-        user_input = input("\nWhat do you think? (or type 'stop' to end): ").strip()
-        
-        # Get LLM interpretation with examples and stop intent
-        interpretation = interpret_user_input_with_llm(user_input, current_quote_text, num_examples=3)
-        
-        # Check if the LLM detected a stop request
+        logger.info(f"Round {round_count}. Displaying quote ID: {current_quote.id}")
+
+        # --- User Interaction & Interpretation ---
+        try:
+            user_input, interpretation = _handle_user_interaction(current_quote_text)
+        except EOFError: # Handle Ctrl+D or unexpected end of input
+            print("\nInput stream closed. Ending session.")
+            break
+        except Exception as e:
+            logger.error(f"Error during user interaction: {e}")
+            print("\nAn unexpected error occurred during interaction. Trying to continue...")
+            continue # Attempt to recover by getting a new quote in the next iteration
+
+        # --- Stop Condition ---
         if interpretation.get("stop_requested", False):
             print("\nOkay, stopping the session. Hope you found some inspiration!")
             break
             
-        # Process examples from interpretation
-        if interpretation.get("positive_examples"): # Use .get for safety
-            print("\nGenerating recommendations based on these examples...")
-            for example in interpretation["positive_examples"]:
-                try:
-                    embedding = get_embedding(example)
-                    positive_embeddings.append(embedding)
-                except Exception as e:
-                    logger.error(f"Error getting embedding for positive example: {e}")
-                    continue
+        # --- Update Embeddings ---
+        _update_embeddings_from_interpretation(
+            interpretation, positive_embeddings, negative_embeddings
+        )
         
-        if interpretation.get("negative_examples"): # Use .get for safety
-            for example in interpretation["negative_examples"]:
-                try:
-                    embedding = get_embedding(example)
-                    negative_embeddings.append(embedding)
-                except Exception as e:
-                    logger.error(f"Error getting embedding for negative example: {e}")
-                    continue
-        
-        # Get next quote
-        try:
-            if positive_embeddings and negative_embeddings:
-                # We have context pairs to use
-                context_pairs = create_context_pairs(positive_embeddings, negative_embeddings)
-                results = query_by_context(
-                    context_pairs=context_pairs,
-                    limit=5,  # Get a few to choose from
-                    exclude_ids=list(seen_quote_ids)
-                )
-                
-                # Pick first unseen quote
-                next_quote = None
-                for result in results:
-                    if result.id not in seen_quote_ids:
-                        next_quote = result
-                        break
-                        
-                if next_quote:
-                    current_quote = next_quote
-                    current_quote_text = current_quote.payload.get("quote", "Quote text not available.")
-                    seen_quote_ids.add(current_quote.id)
-                else:
-                    # If we couldn't find a new quote via context, get a random  one
-                    print("\nLooking for a fresh perspective... (context query didn't yield new results)")
-                    current_quote = get_random_quote()
-                    current_quote_text = current_quote.payload.get("quote", "Quote text not available.")
-                    seen_quote_ids.add(current_quote.id)
-            else:
-                # Not enough context yet, get another random unseen quote
-                print("\nLet me find another quote for you so I can get to know you better...")
-                current_quote = get_random_quote()
-                current_quote_text = current_quote.payload.get("quote", "Quote text not available.")
-                seen_quote_ids.add(current_quote.id)
-                    
-        except Exception as e:
-            logger.error(f"Error getting next quote: {e}")
-            print("\nSorry, I encountered an error getting the next quote. Let's try again.")
-            continue
+        # --- Get Next Quote ---
+        next_quote = _get_next_quote(positive_embeddings, negative_embeddings, seen_quote_ids)
+
+        if next_quote is None:
+            # Error occurred in _get_next_quote (already logged) or no more quotes available
+            print("\nEnding session due to error or lack of suitable quotes.")
+            break
+
+        # --- Update State for Next Round ---
+        current_quote = next_quote
+        current_quote_text = current_quote.payload.get("quote", "Quote text not available.")
+        seen_quote_ids.add(current_quote.id)
+
 
     print("\n=== Session Ended ===")
     return round_count
