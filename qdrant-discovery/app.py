@@ -219,7 +219,7 @@ def interpret_user_input_with_llm(
         logger.error(f"Error in LLM interpretation: {e}")
         return default_response
 
-def _initialize_agent() -> Optional[Tuple[models.PointStruct, Set[int]]]:
+def _initialize_agent() -> Optional[models.PointStruct]:
     """Initializes the agent state, prints welcome messages, and gets the first quote."""
     print("\n=== Motivational Quote Assistant ===")
     print("I'm here to help you discover motivational quotes that resonate with you!")
@@ -234,9 +234,8 @@ def _initialize_agent() -> Optional[Tuple[models.PointStruct, Set[int]]]:
             print("Sorry, I couldn't access the quote database. Please try again later.")
             return None
             
-        seen_quote_ids: Set[int] = {initial_quote.id}
         logger.info(f"Initialized with quote ID: {initial_quote.id}")
-        return initial_quote, seen_quote_ids
+        return initial_quote
         
     except Exception as e:
         logger.error(f"Error getting initial quote: {e}")
@@ -278,10 +277,9 @@ def _update_embeddings_from_interpretation(
 
 def _get_next_quote(
     positive_embeddings: List[List[float]],
-    negative_embeddings: List[List[float]],
-    seen_quote_ids: Set[int]
+    negative_embeddings: List[List[float]]
 ) -> Optional[models.PointStruct]:
-    """Gets the next quote, either via context query or randomly, excluding seen quotes."""
+    """Gets the next quote, either via context query or randomly."""
     try:
         next_quote = None
         if positive_embeddings or negative_embeddings: # Check if *any* embeddings exist
@@ -292,7 +290,6 @@ def _get_next_quote(
                 results = query_by_context(
                     context_pairs=context_pairs,
                     limit=5,
-                    exclude_ids=list(seen_quote_ids)
                 )
             elif positive_embeddings:
                 # Only positive feedback available, use simple query
@@ -300,7 +297,6 @@ def _get_next_quote(
                 results = query_by_context(
                     context_pairs=[models.ContextExamplePair(positive=pos, negative=None) for pos in positive_embeddings],
                     limit=5,
-                    exclude_ids=list(seen_quote_ids)
                 )
             else: # Only negative feedback available
                 print("\nTrying to find something different...")
@@ -309,21 +305,18 @@ def _get_next_quote(
                 # For simplicity, falling back to random if only negative exists.
                 results = [] # Force fallback to random if only negative
 
-            # Pick first unseen quote from results
-            for result in results:
-                if result.id not in seen_quote_ids:
-                    next_quote = result
-                    break
+            if results:
+                next_quote = results[0]
                     
             if not next_quote and results:
-                 print("\nFound similar quotes, but you've seen them all. Getting a random one.")
+                print("\nFound similar quotes, but we'll take the first one.")
             elif not next_quote:
                 print("\nCouldn't find a match based on feedback, getting a random quote.")
 
         if not next_quote:
-            # If no context, not enough context, or context query failed/returned seen quotes
+            # If no context, not enough context, or context query failed/returned no results
             print("\nLet me find another quote for you...")
-            next_quote = get_random_quote(exclude_ids=list(seen_quote_ids))
+            next_quote = get_random_quote()
             if not next_quote: # Handle case where random retrieval also fails
                 print("Couldn't find any more quotes.")
                 return None
@@ -340,11 +333,11 @@ def _get_next_quote(
 def run_agent():
     """Runs the conversational quote recommendation agent."""
     # --- Initialization ---
-    initialization_result = _initialize_agent()
-    if initialization_result is None:
+    initial_quote = _initialize_agent()
+    if initial_quote is None:
         return 0 # Indicate initialization failure
 
-    current_quote, seen_quote_ids = initialization_result
+    current_quote = initial_quote
     current_quote_text = current_quote.payload.get("quote", "Quote text not available.")
     
     # --- State Variables ---
@@ -379,7 +372,7 @@ def run_agent():
         )
         
         # --- Get Next Quote ---
-        next_quote = _get_next_quote(positive_embeddings, negative_embeddings, seen_quote_ids)
+        next_quote = _get_next_quote(positive_embeddings, negative_embeddings)
 
         if next_quote is None:
             # Error occurred in _get_next_quote (already logged) or no more quotes available
@@ -389,7 +382,6 @@ def run_agent():
         # --- Update State for Next Round ---
         current_quote = next_quote
         current_quote_text = current_quote.payload.get("quote", "Quote text not available.")
-        seen_quote_ids.add(current_quote.id)
 
 
     print("\n=== Session Ended ===")

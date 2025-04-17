@@ -90,3 +90,17 @@ For this project, we'll use a small dataset of 1000 inspirational quotes taken f
     *   `query_by_context` in `retrieve.py` searches Qdrant using these context pairs to find quotes similar to the positive examples and dissimilar to the negative ones, excluding previously seen quotes.
     *   A new quote is presented, and the loop continues until the user types "stop".
 3.  **Tracing:** Provide HoneyHive credentials in the `.env` file to trace interactions with the LLM and key agent functions using the `honeyhive` library.
+
+## Viewing the dashboard
+
+After running the application and interacting with it, we can visualize the entire session flow within HoneyHive. Each session trace provides a hierarchical view of the operations performed, including our custom traced functions (`run_agent`, `interpret_user_input_with_llm`, `query_by_context`) and automatically traced events like LLM calls (for generating examples) and embedding generations.
+
+![Traces dashboard](images/traces.png)
+
+This detailed tracing enables powerful analysis and debugging workflows:
+
+- **Analyzing Interaction Length:** How many rounds does it typically take for a user to find a quote they like? Are users genuinely finding good recommendations, or are they abandoning the session after numerous unsuccessful attempts? By logging the `round_count` metadata, we can filter sessions based on the number of rounds (`filter->metadata->round_count`). Examining sessions with very high or very low round counts can reveal whether users are engaged and successful or frustrated and giving up.
+- **Root Cause Analysis:** When a user receives unsatisfying recommendations, the traces help identify the source of the problem. Was it an LLM misinterpretation of the user's feedback? Did the Qdrant retrieval step fail to return relevant results despite accurate context? Or perhaps the user interacted with the application in an unexpected way? Tracing each component allows us to pinpoint bottlenecks and areas for improvement.
+- **Identifying and Annotating Issues:** No system is perfect, and our quote assistant will inevitably encounter edge cases or make mistakes. For instance, the LLM might misinterpret feedback, leading to incorrect positive or negative examples (as shown below, where the LLM incorrectly flagged family/friendship quotes as negative despite the user's preference). HoneyHive allows us to annotate these problematic events directly within the trace, adding comments and ratings. This human feedback is invaluable for targeted improvements and can be easily surfaced later by filtering for annotated traces.
+
+![Traces dashboard](images/wrongLLMcall.png)

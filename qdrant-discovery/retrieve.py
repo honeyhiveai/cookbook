@@ -56,7 +56,6 @@ def get_random_quote() -> List[models.ScoredPoint]:
 def query_by_context(
     context_pairs: List[models.ContextPair],
     limit: int = 10,
-    exclude_ids: List[int] = None
 ) -> List[models.ScoredPoint]:
     """
     Performs a Qdrant Context query using context pairs.
@@ -64,22 +63,12 @@ def query_by_context(
     Args:
         context_pairs: A list of positive/negative context pairs (models.ContextPair).
         limit: The maximum number of results to return.
-        exclude_ids: Optional list of point IDs to exclude from results.
+        # exclude_ids: Optional list of point IDs to exclude from results. # Removed from docstring
 
     Returns:
         A list of ScoredPoint objects from the query results.
     """
     try:
-        # Add a filter if we have IDs to exclude
-        filter_condition = (
-            models.Filter(
-                must_not=[
-                    models.HasIdCondition(has_id=exclude_ids)
-                ]
-            )
-            if exclude_ids
-            else None
-        )
 
         context_queries = [
             models.QueryRequest(
@@ -87,7 +76,6 @@ def query_by_context(
                 limit=limit,
                 with_payload=True,
                 with_vector=True,  # Include vectors in response
-                filter=filter_condition
             ),
         ]
 
