@@ -100,6 +100,7 @@ def create_context_pairs(
 ) -> List[models.ContextPair]:
     """
     Creates context pairs from positive and negative embedding lists.
+    We are randomizing the pairings to avoid recommending the same quote when no additional context is given.
     
     Args:
         positive_embeddings: List of embeddings for positive examples
@@ -108,7 +109,31 @@ def create_context_pairs(
     Returns:
         List of ContextPair objects matching positive and negative embeddings
     """
+    len_pos = len(positive_embeddings)
+    len_neg = len(negative_embeddings)
+    min_len = min(len_pos, len_neg)
+
+    if min_len == 0:
+        return []
+
+    # Take subsets of the embeddings up to the minimum length
+    pos_subset = positive_embeddings[:min_len]
+    neg_subset = negative_embeddings[:min_len]
+    
+    # If lists have different lengths, randomly sample from the longer list 
+    # to match the length of the shorter list.
+    if len_pos > min_len:
+        pos_indices = random.sample(range(len_pos), min_len)
+        pos_subset = [positive_embeddings[i] for i in pos_indices]
+    elif len_neg > min_len:
+        neg_indices = random.sample(range(len_neg), min_len)
+        neg_subset = [negative_embeddings[i] for i in neg_indices]
+
+
+    # Shuffle one of the lists (e.g., negative) to randomize pairing
+    random.shuffle(neg_subset) 
+    
     return [
         models.ContextPair(positive=pos, negative=neg)
-        for pos, neg in zip(positive_embeddings, negative_embeddings)
+        for pos, neg in zip(pos_subset, neg_subset)
     ]
