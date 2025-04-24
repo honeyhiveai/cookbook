@@ -1,0 +1,6 @@
+pymongo==4.11.3
+python-dotenv==1.0.1
+sentence-transformers==3.4.1
+scikit-learn==1.6.1
+honeyhive==0.2.44
+openai==1.59.7
