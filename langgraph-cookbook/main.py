@@ -1,317 +1,213 @@
-#!/usr/bin/env python3
+"""
+Conversation Management and Main Workflow
+"""
 
-# Code generation with RAG and self-correction using LangGraph with HoneyHive tracing
+import pickle
+from datetime import datetime
+from typing import Dict, Any, Optional
+from honeyhive.tracer.custom import trace
+from registry import ConversationContext
+from orchestration import PrincipalRouterAgent
 
-import getpass
-import os
-import sys
-from bs4 import BeautifulSoup as Soup
-from langchain_community.document_loaders.recursive_url_loader import RecursiveUrlLoader
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_openai import ChatOpenAI
-from langchain_anthropic import ChatAnthropic
-from pydantic import BaseModel, Field
-from typing import List
-from typing_extensions import TypedDict, Annotated
-from langgraph.graph import END, StateGraph, START
-# Import HoneyHive for tracing
-from honeyhive import HoneyHiveTracer, trace
+# ---------------------------------------------------------------------------
+# Conversation Manager
+# ---------------------------------------------------------------------------
 
-os.environ["HONEYHIVE_API_KEY"] = "your honeyhive api key"
-os.environ["HONEYHIVE_PROJECT"] = "your honeyhive project"
-os.environ["HONEYHIVE_SOURCE"] = "your honeyhive source"
-os.environ["HONEYHIVE_SESSION_NAME"] = "your session name"
-
-os.environ["OPENAI_API_KEY"] = "your openai api key"
-os.environ["ANTHROPIC_API_KEY"] = "your anthropic api key"
-
-# Initialize HoneyHive tracer
-HoneyHiveTracer.init(
-    api_key=os.environ.get("HONEYHIVE_API_KEY", "your honeyhive api key"),
-    project=os.environ.get("HONEYHIVE_PROJECT", "your honeyhive project"),
-    source="development",
-    session_name="LangGraph Code Generation"
-)
-
-# Load documentation (traced with HoneyHive)
-@trace
-def load_documentation(url):
-    """Load documentation from a URL"""
-    print("---LOADING DOCUMENTATION---")
-    loader = RecursiveUrlLoader(
-        url=url, max_depth=20, extractor=lambda x: Soup(x, "html.parser").text
-    )
-    docs = loader.load()
-
-    # Sort the list based on the URLs and get the text
-    d_sorted = sorted(docs, key=lambda x: x.metadata["source"])
-    d_reversed = list(reversed(d_sorted))
-    concatenated_content = "\n\n\n --- \n\n\n".join(
-        [doc.page_content for doc in d_reversed]
-    )
-    print("---DOCUMENTATION LOADED---")
-    return concatenated_content
-
-# Load HoneyHive documentation
-documentation = load_documentation("https://docs.honeyhive.ai/introduction/quickstart")
-
-# Data model for code output
-class code(BaseModel):
-    """Schema for code solutions to questions about HoneyHive."""
-
-    prefix: str = Field(description="Description of the problem and approach")
-    imports: str = Field(description="Code block import statements")
-    code: str = Field(description="Code block not including import statements")
-
-# Set up LLM with Claude
-code_gen_prompt_claude = ChatPromptTemplate.from_messages(
-    [
-        (
-            "system",
-            """<instructions> You are a coding assistant with expertise in HoneyHive. \n 
-    Here is the LCEL documentation:  \n ------- \n  {context} \n ------- \n Answer the user  question based on the \n 
-    above provided documentation. Ensure any code you provide can be executed with all required imports and variables \n
-    defined. Structure your answer: 1) a prefix describing the code solution, 2) the imports, 3) the functioning code block. \n
-    Invoke the code tool to structure the output correctly. </instructions> \n Here is the user question:""",
-        ),
-        ("placeholder", "{messages}"),
-    ]
-)
-
-# LLM setup with tracing
-@trace
-def setup_llm():
-    """Set up the LLM with structured output"""
-    expt_llm_claude = "claude-3-7-sonnet-latest"
-    llm_claude = ChatAnthropic(
-        model=expt_llm_claude,
-        default_headers={"anthropic-beta": "tools-2024-04-04"},
-    )
-    structured_llm_claude = llm_claude.with_structured_output(code, include_raw=True)
-    return structured_llm_claude
-
-llm = setup_llm()
-
-# Helper function for Claude output processing
-@trace
-def parse_output(solution):
-    """Parse the structured output from Claude"""
-    if "parsed" in solution:
-        return solution["parsed"]
-    return solution
-
-# Set up the code generation chain
-code_gen_chain = code_gen_prompt_claude | llm | parse_output
-
-# State definition for our graph
-class GraphState(TypedDict):
-    """
-    Represents the state of our graph.
-
-    Attributes:
-        error : Binary flag for control flow to indicate whether test error was tripped
-        messages : With user question, error messages, reasoning
-        generation : str with code solution
-        iterations : Number of tries
-    """
-
-    error: str
-    messages: List
-    generation: str
-    iterations: int
-
-# Graph nodes
-@trace
-def generate(state: GraphState):
-    """
-    Generate a code solution
-
-    Args:
-        state (dict): The current graph state
-
-    Returns:
-        state (dict): New key added to state, generation
-    """
-    print("---GENERATING CODE SOLUTION---")
-    messages = state["messages"]
+class ConversationManager:
+    """Manages multi-turn conversations with memory."""
     
-    # Generate the code solution
-    generation = code_gen_chain.invoke(
-        {"messages": messages, "context": documentation}
-    )
-    
-    print("---CODE SOLUTION GENERATED---")
-    return {"generation": generation, "iterations": state["iterations"] + 1}
-
-@trace
-def code_check(state: GraphState):
-    """
-    Verify that the code solution works by:
-    1. Checking that imports don't error
-    2. Checking that code execution doesn't error
-    
-    Args:
-        state (dict): The current graph state with the code solution
-
-    Returns:
-        state (dict): State with updated error flag and messages
-    """
-    print("---CHECKING CODE SOLUTION---")
-    generation = state["generation"]
-    
-    # Extract imports and code
-    imports = generation.imports
-    code_block = generation.code
-    
-    # Check imports
-    error_msg = None
-    try:
-        print("---CHECKING IMPORTS---")
-        exec(imports)
-        print("Imports OK!")
-    except Exception as e:
-        error_msg = f"Import error: {str(e)}"
-        print(f"Import error: {e}")
-    
-    # If imports okay, check code execution
-    if not error_msg:
-        try:
-            print("---CHECKING CODE EXECUTION---")
-            # Only syntax check (don't execute the code for safety)
-            compile(code_block, "<string>", "exec")
-            print("Code syntax OK!")
-        except Exception as e:
-            error_msg = f"Code execution error: {str(e)}"
-            print(f"Code execution error: {e}")
-    
-    # Update state based on checks
-    has_error = error_msg is not None
-    if has_error:
-        messages = state["messages"] + [
-            (
-                "assistant",
-                f"There was an error with the code: {error_msg}. Let me fix it.",
-            )
-        ]
-        return {"error": "yes", "messages": messages}
-    else:
-        return {"error": "no"}
-
-@trace
-def reflect(state: GraphState):
-    """
-    Reflect on the code solution and improve it
-    
-    Args:
-        state (dict): The current graph state
-
-    Returns:
-        state (dict): State with updated messages for reflection
-    """
-    print("---REFLECTING ON SOLUTION---")
-    
-    # Add a reflection step to messages for the next iteration
-    messages = state["messages"] + [
-        (
-            "assistant", 
-            "Let me review the code once more to make sure it's correct and follows best practices."
+    def __init__(self, session_id: str):
+        self.session_id = session_id
+        self.context = ConversationContext(
+            conversation_id=session_id,
+            turns=[],
+            user_preferences={},
+            task_outcomes={},
+            active_agents=[]
         )
-    ]
+        self.max_context_turns = 10
     
-    return {"messages": messages}
+    @trace()
+    def add_turn(self, user_input: str, response: str, metadata: Dict[str, Any]):
+        """Add a conversation turn to history."""
+        turn = {
+            "timestamp": datetime.now().isoformat(),
+            "user_input": user_input,
+            "response": response,
+            "metadata": metadata
+        }
+        self.context.turns.append(turn)
+        
+        # Keep only recent turns in context
+        if len(self.context.turns) > self.max_context_turns:
+            self.context.turns = self.context.turns[-self.max_context_turns:]
+    
+    @trace()
+    def update_preferences(self, preferences: Dict[str, Any]):
+        """Update user preferences based on interactions."""
+        self.context.user_preferences.update(preferences)
+    
+    @trace()
+    def get_relevant_context(self, query: str) -> str:
+        """Get relevant context for current query."""
+        if not self.context.turns:
+            return ""
+        
+        # Simple relevance: just return last 3 turns
+        # In production, use embedding similarity
+        recent_turns = self.context.turns[-3:]
+        context_str = "Previous conversation:\n"
+        for turn in recent_turns:
+            context_str += f"User: {turn['user_input'][:100]}...\n"
+            context_str += f"Assistant: {turn['response'][:100]}...\n\n"
+        
+        return context_str
+    
+    def save_session(self):
+        """Save session to disk."""
+        with open(f"session_{self.session_id}.pkl", "wb") as f:
+            pickle.dump(self.context, f)
+    
+    def load_session(self):
+        """Load session from disk."""
+        try:
+            with open(f"session_{self.session_id}.pkl", "rb") as f:
+                self.context = pickle.load(f)
+        except FileNotFoundError:
+            pass
 
-@trace
-def decide_to_finish(state: GraphState):
-    """
-    Decide whether to finish or try again
-    
-    Args:
-        state (dict): The current graph state
+# ---------------------------------------------------------------------------
+# Main Enhanced Workflow
+# ---------------------------------------------------------------------------
 
-    Returns:
-        str: "reflect", "finish", or "generate"
-    """
-    error = state["error"]
-    iterations = state["iterations"]
-    max_iterations = 3
+@trace()
+def process_single_query(query: str, conversation_manager: ConversationManager) -> Dict[str, Any]:
+    """Process a single user query through the multi-agent system."""
     
-    # If there's an error and we haven't reached max iterations, generate again
-    if error == "yes" and iterations < max_iterations:
-        print(f"---ERROR DETECTED, REGENERATING (Iteration {iterations}/{max_iterations})---")
-        return "generate"
+    principal_router = PrincipalRouterAgent()
     
-    # If no error but want to reflect before finishing (optional)
-    # Change flag to "reflect" to enable this branch
-    flag = "do not reflect"  # Change to "reflect" to enable reflection
-    if error == "no" and flag == "reflect":
-        print("---NO ERROR, REFLECTING BEFORE FINISHING---")
-        return "reflect"
+    # Get relevant context
+    context_str = conversation_manager.get_relevant_context(query)
+    if context_str:
+        print(f"\n📚 Using context from previous turns...")
     
-    # Otherwise, finish
-    print("---FINISHING---")
-    return "finish"
-
-# Build the graph
-@trace
-def build_graph():
-    """Build the LangGraph for code generation"""
-    # Create a graph
-    graph_builder = StateGraph(GraphState)
+    # Process query through orchestration
+    result = principal_router.orchestrate_multi_agent_workflow(query, conversation_manager.context)
     
-    # Add nodes
-    graph_builder.add_node("generate", generate)
-    graph_builder.add_node("code_check", code_check)
-    graph_builder.add_node("reflect", reflect)
-    
-    # Add edges
-    graph_builder.add_edge(START, "generate")
-    graph_builder.add_edge("generate", "code_check")
-    
-    # Add conditional edges
-    graph_builder.add_conditional_edges(
-        "code_check",
-        decide_to_finish,
+    # Update conversation history
+    conversation_manager.add_turn(
+        query,
+        result["response"],
         {
-            "generate": "generate",
-            "reflect": "reflect",
-            "finish": END,
-        },
+            "subtasks": len(result["decomposition"].subtasks),
+            "agents_used": list(set(r["agent"] for r in result["task_results"].values())),
+            "delegations": len(result["delegation_history"])
+        }
     )
-    graph_builder.add_edge("reflect", "generate")
     
-    # Compile the graph
-    return graph_builder.compile()
-
-# Create the graph
-graph = build_graph()
-
-# Function to run the graph with a question
-@trace
-def solve_coding_question(question):
-    """Run the graph to solve a coding question"""
-    # Initialize the state
-    state = {
-        "error": "no",
-        "messages": [("human", question)],
-        "generation": None,
-        "iterations": 0,
-    }
+    # Learn from interaction (simplified)
+    if "financial" in query.lower():
+        conversation_manager.update_preferences({"interest": "finance"})
+    if "technical" in query.lower():
+        conversation_manager.update_preferences({"interest": "technology"})
     
-    # Execute the graph
-    result = graph.invoke(state)
-    
-    # Return the generated code solution
-    return result["generation"]
+    return result
 
-# Example usage
+@trace()
+def run_conversation_loop(conversation_manager: ConversationManager):
+    """Run the interactive conversation loop."""
+    
+    print("=== CommBank Enhanced Multi-Agent System ===")
+    print("Features:")
+    print("- LLM-powered task decomposition and routing")
+    print("- Dynamic agent selection based on capabilities")
+    print("- Advanced nested delegation patterns")
+    print("- Multi-turn conversation support")
+    print("- Rich tool ecosystem")
+    print("\nType 'exit' to end the conversation\n")
+    
+    while True:
+        user_input = input("\n💬 You: ").strip()
+        if user_input.lower() in ['exit', 'quit', 'bye']:
+            print("\n👋 Ending conversation. Saving session...")
+            conversation_manager.save_session()
+            break
+        
+        if not user_input:
+            continue
+        
+        print("\n🔄 Processing your request...")
+        
+        try:
+            result = process_single_query(user_input, conversation_manager)
+            
+            # Display response
+            print("\n✅ Response:")
+            print("-" * 80)
+            print(result["response"])
+            print("-" * 80)
+            
+            # Show delegation history if any
+            if result["delegation_history"]:
+                print("\n🔄 Delegation chain:")
+                for delegation in result["delegation_history"]:
+                    print(f"  {delegation.from_agent} → {delegation.to_agent}: {delegation.reason}")
+        
+        except Exception as e:
+            print(f"\n❌ Error processing query: {e}")
+            import traceback
+            traceback.print_exc()
+
+@trace()
+def run(session_id: Optional[str] = None):
+    """Main entry point for running the enhanced multi-agent system."""
+    
+    # Create or load session
+    if not session_id:
+        session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+        print(f"Starting new session: {session_id}")
+    else:
+        print(f"Loading session: {session_id}")
+    
+    conversation_manager = ConversationManager(session_id)
+    conversation_manager.load_session()
+    
+    try:
+        run_conversation_loop(conversation_manager)
+    except KeyboardInterrupt:
+        print("\n\n⚠️  Interrupted. Saving session...")
+        conversation_manager.save_session()
+    except Exception as e:
+        print(f"\n❌ Fatal error: {e}")
+        conversation_manager.save_session()
+        raise
+
+# ---------------------------------------------------------------------------
+# CLI Entry Point
+# ---------------------------------------------------------------------------
+
 if __name__ == "__main__":
-    question = "How can I use HoneyHive tracing with LangGraph?"
-    solution = solve_coding_question(question)
+    import sys
+    from honeyhive.tracer import HoneyHiveTracer
+    from config import HONEYHIVE_CONFIG
     
-    print("\n=== FINAL SOLUTION ===")
-    print(f"\n{solution.prefix}\n")
-    print(f"IMPORTS:\n{solution.imports}\n")
-    print(f"CODE:\n{solution.code}")
+    # Initialize HoneyHive at the beginning of main function
+    HoneyHiveTracer.init(**HONEYHIVE_CONFIG)
     
-    # This will end the current session in HoneyHive
-    # For a new session, call HoneyHiveTracer.init() again
+    # For testing purposes, run a simple query instead of interactive mode
+    conversation_manager = ConversationManager("test_session")
+    
+    # Test query
+    test_query = "What are the current stock market trends for tech companies?"
+    print(f"Testing with query: {test_query}")
+    
+    try:
+        result = process_single_query(test_query, conversation_manager)
+        print("\n✅ Response:")
+        print("-" * 80)
+        print(result["response"])
+        print("-" * 80)
+    except Exception as e:
+        print(f"\n❌ Error: {e}")
+        import traceback
+        traceback.print_exc()
