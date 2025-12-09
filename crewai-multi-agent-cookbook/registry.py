@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import List, Dict, Any
 from crewai.tools import BaseTool
-from honeyhive.tracer.custom import trace
+from honeyhive.tracer import trace
 from config import SERPAPI_KEY
 
 # ---------------------------------------------------------------------------

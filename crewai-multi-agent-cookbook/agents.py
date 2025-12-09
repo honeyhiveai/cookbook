@@ -4,7 +4,7 @@ All Agent Classes and Registry
 
 from typing import List
 from crewai import Agent, Task, Crew, Process
-from honeyhive.tracer.custom import trace
+from honeyhive.tracer import trace
 from registry import SubTask, AgentCapability, TOOL_REGISTRY
 
 # ---------------------------------------------------------------------------

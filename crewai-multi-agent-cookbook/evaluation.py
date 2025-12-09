@@ -29,7 +29,7 @@ Note: Interactive CLI mode has been removed. All inputs come from the evaluation
 from datetime import datetime
 from typing import Dict, Any, Optional
 from honeyhive.tracer import HoneyHiveTracer
-from honeyhive.tracer.custom import trace
+from honeyhive.tracer import trace
 from honeyhive import evaluate
 
 # Import all components from our refactored modules

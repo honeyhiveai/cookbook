@@ -5,7 +5,7 @@ Conversation Management and Main Workflow
 import pickle
 from datetime import datetime
 from typing import Dict, Any, Optional
-from honeyhive.tracer.custom import trace
+from honeyhive.tracer import trace
 from registry import ConversationContext
 from orchestration import PrincipalRouterAgent
 

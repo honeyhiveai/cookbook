@@ -6,7 +6,7 @@ import json
 from typing import Dict, Any, List, Optional, Tuple
 import openai
 from crewai import Agent
-from honeyhive.tracer.custom import trace
+from honeyhive.tracer import trace
 from registry import (
     TaskDecomposition, SubTask, TaskType, ConversationContext, 
     DelegationDecision
