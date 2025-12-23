@@ -15,7 +15,7 @@
     "@opentelemetry/instrumentation": "^0.56.0",
     "@opentelemetry/sdk-logs": "^0.56.0",
     "@vercel/otel": "^1.10.0",
-    "ai": "^4.0.18",
+    "ai": "^5.0.52",
     "next": "14.2.35",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
