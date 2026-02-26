@@ -1,4 +1,0 @@
-honeyhive
-litellm
-duckdb
-datasets

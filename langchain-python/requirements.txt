@@ -1,6 +1,0 @@
-langchain
-langchain-community
-openai
-faiss-cpu
-tiktoken
-honeyhive
