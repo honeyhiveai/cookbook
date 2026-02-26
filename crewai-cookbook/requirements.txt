@@ -1,4 +1,0 @@
-crewai
-honeyhive
-python-dotenv
-openai 

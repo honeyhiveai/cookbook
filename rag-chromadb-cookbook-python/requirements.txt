@@ -1,5 +1,0 @@
-langchain
-langchain-community
-langchain-chroma
-langchain-openai
-honeyhive

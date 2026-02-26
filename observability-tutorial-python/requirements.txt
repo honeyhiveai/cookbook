@@ -1,4 +1,0 @@
-pinecone
-pinecone-client
-openai
-honeyhive
