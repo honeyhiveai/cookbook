@@ -5,6 +5,7 @@ Run:
     uv run python evaluate.py
 """
 
+import re
 import uuid
 
 from dotenv import load_dotenv
@@ -20,11 +21,56 @@ from main import APP_NAME, USER_ID, build_agent_input, build_agents, extract_tex
 load_dotenv()
 
 openai_client = OpenAI()
+SPECIALIST_CATEGORIES = {
+    "billing_agent": "billing",
+    "technical_agent": "technical",
+}
+SCORE_PATTERN = re.compile(r"\b(?:0(?:\.\d+)?|1(?:\.0+)?)\b")
+
+
+def get_query(datapoint: dict) -> str:
+    """Validate and return the customer query from an eval datapoint."""
+    inputs = datapoint.get("inputs")
+    if not isinstance(inputs, dict):
+        raise ValueError("Datapoint must include an 'inputs' dictionary.")
+
+    query = inputs.get("query")
+    if not isinstance(query, str) or not query.strip():
+        raise ValueError("Datapoint must include a non-empty 'inputs.query' string.")
+
+    return query.strip()
+
+
+def parse_judge_score(raw_score: str | None) -> float:
+    """Extract a 0.0-1.0 score from an LLM judge response."""
+    if not raw_score:
+        raise ValueError("Judge returned an empty score.")
+
+    match = SCORE_PATTERN.search(raw_score)
+    if match is None:
+        raise ValueError(f"Judge did not return a numeric score: {raw_score!r}")
+
+    score = float(match.group(0))
+    if not 0.0 <= score <= 1.0:
+        raise ValueError(f"Judge score must be between 0.0 and 1.0, got {score}.")
+    return score
+
+
+def detect_specialist(authors: list[str]) -> str:
+    """Infer which specialist handled the request from ADK event authors."""
+    specialists = [author for author in authors if author in SPECIALIST_CATEGORIES]
+    unique_specialists = list(dict.fromkeys(specialists))
+
+    if len(unique_specialists) == 1:
+        return unique_specialists[0]
+    if len(unique_specialists) > 1:
+        return "multiple"
+    return "unknown"
 
 
 async def run_support_agent(datapoint: dict) -> dict:
     """Run the support agent on a single datapoint."""
-    query = datapoint["inputs"]["query"]
+    query = get_query(datapoint)
 
     coordinator = build_agents()
     session_service = InMemorySessionService()
@@ -45,82 +91,67 @@ async def run_support_agent(datapoint: dict) -> dict:
     agent_input = build_agent_input(query, USER_ID)
     msg = Content(role="user", parts=[Part(text=agent_input)])
     response_text = ""
+    event_authors: list[str] = []
     async for event in runner.run_async(
         user_id=USER_ID,
         session_id=session_id,
         new_message=msg,
     ):
+        author = getattr(event, "author", None)
+        if isinstance(author, str):
+            event_authors.append(author)
         if event.is_final_response():
             response_text = extract_text(event.content)
 
-    return {"response": response_text}
+    return {
+        "response": response_text,
+        "handled_by": detect_specialist(event_authors),
+        "event_authors": event_authors,
+    }
 
 
 def response_quality(outputs: dict, inputs: dict, ground_truth: dict) -> float:
     """Judge whether the response is accurate, helpful, and appropriately toned."""
-    try:
-        result = openai_client.chat.completions.create(
-            model="gpt-4o-mini",
-            temperature=0,
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You evaluate customer support responses.\n"
-                        "Score the response from 0.0 to 1.0 based on:\n"
-                        "- whether it answers the question\n"
-                        "- whether it is accurate for the expected category\n"
-                        "- whether the tone is professional and helpful\n\n"
-                        "Reply with only a number between 0.0 and 1.0."
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": (
-                        f"Customer query: {inputs['query']}\n"
-                        f"Expected category: {ground_truth['category']}\n"
-                        f"Agent response: {outputs.get('response', '')}"
-                    ),
-                },
-            ],
-        )
-        return float(result.choices[0].message.content.strip())
-    except Exception:
-        return 0.0
+    result = openai_client.chat.completions.create(
+        model="gpt-4o-mini",
+        temperature=0,
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "You evaluate customer support responses.\n"
+                    "Score the response from 0.0 to 1.0 based on:\n"
+                    "- whether it answers the question\n"
+                    "- whether it is accurate for the expected category\n"
+                    "- whether the tone is professional and helpful\n\n"
+                    "Reply with only a number between 0.0 and 1.0."
+                ),
+            },
+            {
+                "role": "user",
+                "content": (
+                    f"Customer query: {inputs['query']}\n"
+                    f"Expected category: {ground_truth['category']}\n"
+                    f"Agent response: {outputs.get('response', '')}"
+                ),
+            },
+        ],
+    )
+    return parse_judge_score(result.choices[0].message.content)
 
 
 def correct_routing(outputs: dict, inputs: dict, ground_truth: dict) -> float:
-    """Judge whether the query reached the right specialist."""
-    try:
-        result = openai_client.chat.completions.create(
-            model="gpt-4o-mini",
-            temperature=0,
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You judge specialist routing for a customer support system.\n"
-                        "The available specialists are:\n"
-                        "- billing: charges, balances, invoices, refunds, payments\n"
-                        "- technical: bugs, login problems, exports, APIs, troubleshooting\n\n"
-                        "Based on the query and response, decide whether the response came from "
-                        "the correct specialist for the expected category.\n"
-                        "Reply with only 1.0 for correct routing or 0.0 for incorrect routing."
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": (
-                        f"Customer query: {inputs['query']}\n"
-                        f"Expected category: {ground_truth['category']}\n"
-                        f"Agent response: {outputs.get('response', '')}"
-                    ),
-                },
-            ],
+    """Check whether ADK delegated the query to the expected specialist."""
+    handled_by = outputs.get("handled_by")
+    if handled_by not in SPECIALIST_CATEGORIES:
+        raise ValueError(
+            "Could not determine a single delegated specialist from ADK events. "
+            f"Observed authors: {outputs.get('event_authors', [])!r}"
         )
-        return float(result.choices[0].message.content.strip())
-    except Exception:
-        return 0.0
+
+    expected_category = ground_truth["category"]
+    observed_category = SPECIALIST_CATEGORIES[handled_by]
+    return 1.0 if observed_category == expected_category else 0.0
 
 
 dataset = [

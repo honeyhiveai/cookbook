@@ -23,7 +23,7 @@ from honeyhive import HoneyHiveTracer, trace
 
 load_dotenv()
 
-MODEL = "gemini-2.5-flash"
+MODEL = "gemini-flash-latest"
 APP_NAME = "customer-support-cookbook"
 USER_ID = "customer_42"
 CUSTOMER_DB = {

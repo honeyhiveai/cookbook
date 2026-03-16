@@ -56,7 +56,7 @@ source .venv/bin/activate
 uv pip install -r requirements.txt
 ```
 
-This installs the latest available HoneyHive beta SDK together with the other cookbook dependencies.
+This keeps the cookbook on the HoneyHive beta SDK release line while installing the other dependencies.
 
 3. Create a `.env` file:
 
@@ -92,7 +92,7 @@ uv run python evaluate.py
 This runs eight test queries through the agent and evaluates:
 
 - `response_quality`: LLM-as-judge scoring for helpfulness, accuracy, and tone
-- `correct_routing`: LLM-as-judge verification that the right specialist handled the query
+- `correct_routing`: exact verification that ADK delegated to the expected specialist based on observed event authors
 
 ## What HoneyHive adds
 
