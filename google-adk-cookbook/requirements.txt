@@ -1,0 +1,5 @@
+honeyhive>=1.0.0rc0
+google-adk>=1.0.0
+openinference-instrumentation-google-adk
+python-dotenv
+openai
