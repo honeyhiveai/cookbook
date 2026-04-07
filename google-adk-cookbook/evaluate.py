@@ -16,7 +16,7 @@ from openai import OpenAI
 
 from honeyhive import evaluate
 
-from main import APP_NAME, USER_ID, build_agent_input, build_agents, extract_text
+from main import APP_NAME, USER_ID, build_agent_input, build_agents
 
 load_dotenv()
 
@@ -100,8 +100,8 @@ async def run_support_agent(datapoint: dict) -> dict:
         author = getattr(event, "author", None)
         if isinstance(author, str):
             event_authors.append(author)
-        if event.is_final_response():
-            response_text = extract_text(event.content)
+        if event.is_final_response() and event.content and event.content.parts:
+            response_text = event.content.parts[0].text or ""
 
     return {
         "response": response_text,

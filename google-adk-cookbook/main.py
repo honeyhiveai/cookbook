@@ -14,6 +14,7 @@ import os
 
 from dotenv import load_dotenv
 from google.adk.agents import LlmAgent
+from google.adk.models.lite_llm import LiteLlm
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai.types import Content, Part
@@ -23,7 +24,7 @@ from honeyhive import HoneyHiveTracer, trace
 
 load_dotenv()
 
-MODEL = "gemini-flash-latest"
+MODEL = LiteLlm(model="openai/gpt-4o-mini")
 APP_NAME = "customer-support-cookbook"
 USER_ID = "customer_42"
 CUSTOMER_DB = {
@@ -144,14 +145,6 @@ def build_agents() -> LlmAgent:
     )
 
 
-def extract_text(content: Content | None) -> str:
-    """Return only text parts from an ADK content payload."""
-    if not content or not getattr(content, "parts", None):
-        return ""
-    text_parts = [part.text for part in content.parts if getattr(part, "text", None)]
-    return "\n".join(text_parts).strip()
-
-
 # HoneyHive custom spans are useful for your own app-layer work outside ADK,
 # like loading customer records before handing a request to the agent.
 @trace()
@@ -197,8 +190,8 @@ async def handle_customer_query(runner: Runner, session_id: str, query: str) -> 
         session_id=session_id,
         new_message=msg,
     ):
-        if event.is_final_response():
-            response_text = extract_text(event.content)
+        if event.is_final_response() and event.content and event.content.parts:
+            response_text = event.content.parts[0].text or ""
     return response_text
 
 
@@ -265,9 +258,7 @@ async def main() -> None:
         print("Check HoneyHive dashboard for traces.")
         print("=" * 60)
     finally:
-        flush = getattr(tracer, "force_flush", None) or getattr(tracer, "flush", None)
-        if callable(flush):
-            flush()
+        tracer.flush()
         instrumentor.uninstrument()
 
 

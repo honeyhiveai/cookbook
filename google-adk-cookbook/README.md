@@ -2,6 +2,8 @@
 
 This cookbook currently targets the HoneyHive beta SDK release line.
 
+It is currently configured to run Google ADK with OpenAI models through LiteLLM.
+
 End-to-end example: build a multi-agent customer support bot with [Google ADK](https://google.github.io/adk-docs/) and add observability plus evaluation with [HoneyHive](https://honeyhive.ai).
 
 ## What's in here
@@ -38,8 +40,7 @@ Prerequisites:
 
 - Python 3.11+
 - A HoneyHive account
-- A Google AI API key
-- An OpenAI API key for `evaluate.py`
+- An OpenAI API key
 
 1. Clone the repo and enter this directory:
 
@@ -58,13 +59,14 @@ uv pip install -r requirements.txt
 
 This keeps the cookbook on the HoneyHive beta SDK release line while installing the other dependencies.
 
+The current setup uses LiteLLM so ADK can call OpenAI models with your existing `OPENAI_API_KEY`.
+
 3. Create a `.env` file:
 
 ```bash
 HH_API_KEY=your-honeyhive-api-key
 HH_PROJECT=your-project-name
 HH_API_URL=https://api.honeyhive.ai  # optional, override for non-production environments
-GOOGLE_API_KEY=your-google-ai-api-key
 OPENAI_API_KEY=your-openai-key
 ```
 
