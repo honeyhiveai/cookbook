@@ -5,7 +5,7 @@ Run:
     uv run python evaluate.py
 """
 
-import re
+import json
 import uuid
 
 from dotenv import load_dotenv
@@ -13,6 +13,8 @@ from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai.types import Content, Part
 from openai import OpenAI
+from openinference.instrumentation.google_adk import GoogleADKInstrumentor
+from openinference.instrumentation.openai import OpenAIInstrumentor
 
 from honeyhive import evaluate
 
@@ -21,44 +23,16 @@ from main import APP_NAME, USER_ID, build_agent_input, build_agents
 load_dotenv()
 
 openai_client = OpenAI()
-SPECIALIST_CATEGORIES = {
-    "billing_agent": "billing",
-    "technical_agent": "technical",
-}
-SCORE_PATTERN = re.compile(r"\b(?:0(?:\.\d+)?|1(?:\.0+)?)\b")
-
-
-def get_query(datapoint: dict) -> str:
-    """Validate and return the customer query from an eval datapoint."""
-    inputs = datapoint.get("inputs")
-    if not isinstance(inputs, dict):
-        raise ValueError("Datapoint must include an 'inputs' dictionary.")
-
-    query = inputs.get("query")
-    if not isinstance(query, str) or not query.strip():
-        raise ValueError("Datapoint must include a non-empty 'inputs.query' string.")
-
-    return query.strip()
-
-
-def parse_judge_score(raw_score: str | None) -> float:
-    """Extract a 0.0-1.0 score from an LLM judge response."""
-    if not raw_score:
-        raise ValueError("Judge returned an empty score.")
-
-    match = SCORE_PATTERN.search(raw_score)
-    if match is None:
-        raise ValueError(f"Judge did not return a numeric score: {raw_score!r}")
-
-    score = float(match.group(0))
-    if not 0.0 <= score <= 1.0:
-        raise ValueError(f"Judge score must be between 0.0 and 1.0, got {score}.")
-    return score
 
 
 def detect_specialist(authors: list[str]) -> str:
     """Infer which specialist handled the request from ADK event authors."""
-    specialists = [author for author in authors if author in SPECIALIST_CATEGORIES]
+    specialists = []
+    for author in authors:
+        if author == "billing_agent":
+            specialists.append("billing")
+        elif author == "technical_agent":
+            specialists.append("technical")
     unique_specialists = list(dict.fromkeys(specialists))
 
     if len(unique_specialists) == 1:
@@ -70,7 +44,7 @@ def detect_specialist(authors: list[str]) -> str:
 
 async def run_support_agent(datapoint: dict) -> dict:
     """Run the support agent on a single datapoint."""
-    query = get_query(datapoint)
+    query = datapoint["inputs"]["query"].strip()
 
     coordinator = build_agents()
     session_service = InMemorySessionService()
@@ -115,6 +89,7 @@ def response_quality(outputs: dict, inputs: dict, ground_truth: dict) -> float:
     result = openai_client.chat.completions.create(
         model="gpt-4o-mini",
         temperature=0,
+        response_format={"type": "json_object"},
         messages=[
             {
                 "role": "system",
@@ -124,7 +99,7 @@ def response_quality(outputs: dict, inputs: dict, ground_truth: dict) -> float:
                     "- whether it answers the question\n"
                     "- whether it is accurate for the expected category\n"
                     "- whether the tone is professional and helpful\n\n"
-                    "Reply with only a number between 0.0 and 1.0."
+                    'Respond with JSON of the form {"score": <number between 0.0 and 1.0>}.'
                 ),
             },
             {
@@ -137,21 +112,26 @@ def response_quality(outputs: dict, inputs: dict, ground_truth: dict) -> float:
             },
         ],
     )
-    return parse_judge_score(result.choices[0].message.content)
+    raw = result.choices[0].message.content
+    if not raw:
+        raise ValueError("Judge returned an empty response.")
+
+    score = float(json.loads(raw)["score"])
+    if not 0.0 <= score <= 1.0:
+        raise ValueError(f"Judge score must be between 0.0 and 1.0, got {score}.")
+    return score
 
 
 def correct_routing(outputs: dict, inputs: dict, ground_truth: dict) -> float:
     """Check whether ADK delegated the query to the expected specialist."""
     handled_by = outputs.get("handled_by")
-    if handled_by not in SPECIALIST_CATEGORIES:
+    if handled_by not in {"billing", "technical"}:
         raise ValueError(
             "Could not determine a single delegated specialist from ADK events. "
             f"Observed authors: {outputs.get('event_authors', [])!r}"
         )
 
-    expected_category = ground_truth["category"]
-    observed_category = SPECIALIST_CATEGORIES[handled_by]
-    return 1.0 if observed_category == expected_category else 0.0
+    return 1.0 if handled_by == ground_truth["category"] else 0.0
 
 
 dataset = [
@@ -199,6 +179,10 @@ if __name__ == "__main__":
         function=run_support_agent,
         dataset=dataset,
         evaluators=[response_quality, correct_routing],
+        instrumentors=[
+            lambda: GoogleADKInstrumentor(),
+            lambda: OpenAIInstrumentor(),
+        ],
         name="customer-support-eval",
     )
 

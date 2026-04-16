@@ -204,11 +204,7 @@ async def main() -> None:
         source="cookbook",
     )
     instrumentor = GoogleADKInstrumentor()
-    tracer_provider = getattr(tracer, "provider", None)
-    if tracer_provider is not None:
-        instrumentor.instrument(tracer_provider=tracer_provider)
-    else:
-        instrumentor.instrument()
+    instrumentor.instrument(tracer_provider=tracer.provider)
     session_service = InMemorySessionService()
 
     try:
@@ -239,14 +235,16 @@ async def main() -> None:
         print("Customer Support Agent (Google ADK + HoneyHive)")
         print("=" * 60)
 
-        for i, query in enumerate(queries):
-            session_id = f"{tracer.session_id}-{i}"
-            await session_service.create_session(
-                app_name=APP_NAME,
-                user_id=USER_ID,
-                session_id=session_id,
-            )
+        # Reuse one ADK session for the whole HoneyHive session, so the
+        # conversation history is continuous and matches the trace.
+        session_id = tracer.session_id
+        await session_service.create_session(
+            app_name=APP_NAME,
+            user_id=USER_ID,
+            session_id=session_id,
+        )
 
+        for query in queries:
             print(f"\nCustomer: {query}")
             response = await handle_customer_query(runner, session_id, query)
             preview = response[:200]
