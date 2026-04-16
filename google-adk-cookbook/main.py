@@ -24,78 +24,33 @@ from honeyhive import HoneyHiveTracer, trace
 
 load_dotenv()
 
-MODEL = LiteLlm(model="openai/gpt-4o-mini")
+MODEL = LiteLlm(model="openai/gpt-5.4-mini")
 APP_NAME = "customer-support-cookbook"
 USER_ID = "customer_42"
 CUSTOMER_DB = {
-    USER_ID: {
-        "billing_customer_id": "CUST-2048",
-        "plan": "enterprise",
-        "support_tier": "priority",
-        "account_status": "active",
-        "region": "us-east-1",
-    }
+    USER_ID: {"plan": "enterprise", "billing_customer_id": "CUST-2048"},
 }
 
 
 def lookup_billing(customer_id: str, query_type: str) -> dict:
     """Look up billing information for a customer."""
-    records = {
-        "balance": {
-            "customer_id": customer_id,
-            "current_balance": "$1,247.50",
-            "due_date": "2026-03-01",
-            "status": "current",
-        },
-        "charges": {
-            "customer_id": customer_id,
-            "recent_charges": [
-                {"date": "2026-02-01", "amount": "$99.00", "description": "Monthly subscription"},
-                {"date": "2026-02-05", "amount": "$24.50", "description": "API overage"},
-            ],
-        },
-        "refund_status": {
-            "customer_id": customer_id,
-            "refund_id": "REF-2026-0142",
-            "amount": "$24.50",
-            "status": "processing",
-            "estimated_completion": "2026-02-20",
-        },
-    }
-    return records.get(query_type, {"error": f"Unknown query type: {query_type}"})
+    if query_type == "balance":
+        return {"customer_id": customer_id, "balance": "$1,247.50", "due": "2026-03-01"}
+    if query_type == "refund_status":
+        return {"customer_id": customer_id, "refund_id": "REF-2026-0142", "amount": "$24.50", "status": "processing"}
+    return {"error": f"Unknown query type: {query_type}"}
 
 
 def search_knowledge_base(issue: str) -> dict:
     """Search the technical knowledge base for solutions to product issues."""
-    solutions = {
-        "export": {
-            "title": "Export Feature - Error 500",
-            "solution": "Clear browser cache and retry. If the issue persists, check that "
-            "your dataset is under 10,000 rows (the export limit for free plans).",
-            "article_id": "KB-1042",
-        },
-        "api": {
-            "title": "API Rate Limiting",
-            "solution": "The default rate limit is 100 requests/minute. Enterprise plans "
-            "support up to 1,000 requests/minute. Add exponential backoff to your client.",
-            "article_id": "KB-0891",
-        },
-        "login": {
-            "title": "Login / Authentication Issues",
-            "solution": "Try resetting your password at /reset-password. If using SSO, "
-            "confirm your identity provider is configured correctly in Settings > SSO.",
-            "article_id": "KB-0567",
-        },
-    }
-    issue_lower = issue.lower()
-    for keyword, article in solutions.items():
-        if keyword in issue_lower:
-            return article
-    return {
-        "title": "General Troubleshooting",
-        "solution": "Please provide more details about your issue so we can help.",
-        "article_id": "KB-0001",
-    }
+    issue = issue.lower()
+    if "export" in issue:
+        return {"article_id": "KB-1042", "solution": "Clear browser cache and retry. Free-plan exports are capped at 10k rows."}
+    if "api" in issue:
+        return {"article_id": "KB-0891", "solution": "Default rate limit is 100 req/min. Enterprise gets 1000 req/min."}
+    if "login" in issue:
+        return {"article_id": "KB-0567", "solution": "Reset at /reset-password. For SSO, check Settings > SSO."}
+    return {"article_id": "KB-0001", "solution": "Please provide more details."}
 
 
 def build_agents() -> LlmAgent:
@@ -103,161 +58,111 @@ def build_agents() -> LlmAgent:
     billing_agent = LlmAgent(
         name="billing_agent",
         model=MODEL,
-        description=(
-            "Handles billing inquiries including balances, recent charges, "
-            "refund status, invoices, and payment questions."
-        ),
+        description="Handles billing: balances, charges, refund status, invoices.",
         instruction=(
-            "You are a billing support specialist.\n"
-            "Use the lookup_billing tool for account balances, charges, or refunds.\n"
-            "Summarize the result clearly with amounts, dates, and the next step.\n"
-            "If the customer has not provided a customer ID, ask for it."
+            "You are a billing support specialist. "
+            "Use lookup_billing for balances, charges, or refunds. "
+            "Summarize the result with amounts, dates, and the next step."
         ),
         tools=[lookup_billing],
     )
-
     technical_agent = LlmAgent(
         name="technical_agent",
         model=MODEL,
-        description=(
-            "Handles product bugs, feature questions, API issues, and general troubleshooting."
-        ),
+        description="Handles product bugs, API questions, and general troubleshooting.",
         instruction=(
-            "You are a technical support specialist.\n"
-            "Use the search_knowledge_base tool for bugs, errors, export issues, login problems, "
-            "and API questions.\n"
-            "Respond with concrete troubleshooting steps and note when an issue may need escalation."
+            "You are a technical support specialist. "
+            "Use search_knowledge_base for bugs, exports, login, and API questions. "
+            "Respond with concrete troubleshooting steps."
         ),
         tools=[search_knowledge_base],
     )
-
     return LlmAgent(
         name="customer_support",
         model=MODEL,
         description="Routes customer support requests to the right specialist.",
         instruction=(
-            "You are the front-line customer support coordinator.\n"
-            "Delegate billing issues to billing_agent.\n"
-            "Delegate product bugs, login issues, exports, and API questions to technical_agent.\n"
-            "Do not answer specialist questions yourself. Always delegate first and then return a concise final response."
+            "You are the front-line customer support coordinator. "
+            "Delegate billing issues to billing_agent; product, login, export, and API issues to technical_agent. "
+            "Do not answer specialist questions yourself — always delegate first, then return a concise final response."
         ),
         sub_agents=[billing_agent, technical_agent],
     )
 
 
-# HoneyHive custom spans are useful for your own app-layer work outside ADK,
-# like loading customer records before handing a request to the agent.
+# @trace() captures this app-layer function as a custom HoneyHive span,
+# so it shows up alongside the auto-instrumented ADK spans.
 @trace()
 def load_customer_context(customer_id: str) -> dict:
     """Load customer context from the application data store."""
-    return CUSTOMER_DB.get(
-        customer_id,
-        {
-            "billing_customer_id": customer_id,
-            "plan": "unknown",
-            "support_tier": "standard",
-            "account_status": "unknown",
-            "region": "unknown",
-        },
-    )
+    return CUSTOMER_DB.get(customer_id, {"plan": "unknown", "billing_customer_id": customer_id})
 
 
 def build_agent_input(query: str, customer_id: str) -> str:
-    """Combine the raw query with customer context before sending it to ADK."""
-    customer_context = load_customer_context(customer_id)
+    """Prepend customer context to the raw query before sending it to ADK."""
+    ctx = load_customer_context(customer_id)
     return (
-        "Authenticated customer context:\n"
-        f"- internal_user_id: {customer_id}\n"
-        f"- billing_customer_id: {customer_context['billing_customer_id']}\n"
-        f"- plan: {customer_context['plan']}\n"
-        f"- support_tier: {customer_context['support_tier']}\n"
-        f"- account_status: {customer_context['account_status']}\n"
-        f"- region: {customer_context['region']}\n\n"
-        "Use this context when it helps answer the request. "
-        "Do not repeat internal metadata unless it is relevant.\n\n"
+        f"Customer context: user_id={customer_id}, plan={ctx['plan']}, "
+        f"billing_customer_id={ctx['billing_customer_id']}\n\n"
         f"Customer request: {query.strip()}"
     )
 
 
-async def handle_customer_query(runner: Runner, session_id: str, query: str) -> str:
-    """Send a query to the support agent and return the final response text."""
-    agent_input = build_agent_input(query, USER_ID)
-    msg = Content(role="user", parts=[Part(text=agent_input)])
+async def handle_customer_query(
+    runner: Runner, session_id: str, query: str
+) -> tuple[str, list[str]]:
+    """Send a query to the support agent.
+
+    Returns the final response text and the list of ADK event authors
+    (used by `evaluate.py` to verify which specialist handled the query).
+    """
+    msg = Content(role="user", parts=[Part(text=build_agent_input(query, USER_ID))])
 
     response_text = ""
+    event_authors: list[str] = []
     async for event in runner.run_async(
-        user_id=USER_ID,
-        session_id=session_id,
-        new_message=msg,
+        user_id=USER_ID, session_id=session_id, new_message=msg
     ):
+        author = getattr(event, "author", None)
+        if isinstance(author, str):
+            event_authors.append(author)
         if event.is_final_response() and event.content and event.content.parts:
             response_text = event.content.parts[0].text or ""
-    return response_text
+    return response_text, event_authors
 
 
 async def main() -> None:
     """Run the tracing demo."""
+    # --- HoneyHive setup (3 lines) ---
     tracer = HoneyHiveTracer.init(
         api_key=os.getenv("HH_API_KEY"),
         project=os.getenv("HH_PROJECT"),
         session_name="customer-support",
         source="cookbook",
     )
-    instrumentor = GoogleADKInstrumentor()
-    instrumentor.instrument(tracer_provider=tracer.provider)
-    session_service = InMemorySessionService()
+    GoogleADKInstrumentor().instrument(tracer_provider=tracer.provider)
+    tracer.enrich_session(
+        user_properties={"user_id": USER_ID, "plan": "enterprise"},
+        metadata={"environment": os.getenv("HH_ENV", "local"), "app_version": "2.1.0"},
+    )
 
+    # --- ADK app (unchanged by HoneyHive) ---
     try:
-        tracer.enrich_session(
-            user_properties={
-                "user_id": USER_ID,
-                "plan": "enterprise",
-            },
-            metadata={
-                "environment": os.getenv("HH_ENV", "local"),
-                "app_version": "2.1.0",
-            },
-        )
-
-        coordinator = build_agents()
+        session_service = InMemorySessionService()
         runner = Runner(
-            agent=coordinator,
-            app_name=APP_NAME,
-            session_service=session_service,
+            agent=build_agents(), app_name=APP_NAME, session_service=session_service
         )
-        queries = [
-            "I was charged $24.50 last week but I thought that was supposed to be refunded?",
-            "The export button gives me an error 500 when I try to download my data.",
-            "What's my current account balance?",
-        ]
-
-        print("=" * 60)
-        print("Customer Support Agent (Google ADK + HoneyHive)")
-        print("=" * 60)
-
-        # Reuse one ADK session for the whole HoneyHive session, so the
-        # conversation history is continuous and matches the trace.
-        session_id = tracer.session_id
         await session_service.create_session(
-            app_name=APP_NAME,
-            user_id=USER_ID,
-            session_id=session_id,
+            app_name=APP_NAME, user_id=USER_ID, session_id=tracer.session_id
         )
 
-        for query in queries:
-            print(f"\nCustomer: {query}")
-            response = await handle_customer_query(runner, session_id, query)
-            preview = response[:200]
-            suffix = "..." if len(response) > 200 else ""
-            print(f"Agent:    {preview}{suffix}")
-
-        print("\n" + "=" * 60)
+        query = "I was charged $24.50 last week but I thought that was supposed to be refunded?"
+        print(f"Customer: {query}")
+        response, _ = await handle_customer_query(runner, tracer.session_id, query)
+        print(f"Agent:    {response}")
         print(f"Session ID: {tracer.session_id}")
-        print("Check HoneyHive dashboard for traces.")
-        print("=" * 60)
     finally:
         tracer.flush()
-        instrumentor.uninstrument()
 
 
 if __name__ == "__main__":

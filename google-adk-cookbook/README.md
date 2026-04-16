@@ -8,11 +8,13 @@ End-to-end example: build a multi-agent customer support bot with [Google ADK](h
 
 ## What's in here
 
-| File | What it does |
-|------|-------------|
-| `main.py` | Runs a coordinator agent plus billing and technical specialists with HoneyHive tracing |
-| `evaluate.py` | Runs the same agent against a small dataset and scores outputs with HoneyHive experiments |
-| `requirements.txt` | Python dependencies for the cookbook |
+
+| File               | What it does                                                                              |
+| ------------------ | ----------------------------------------------------------------------------------------- |
+| `main.py`          | Runs a coordinator agent plus billing and technical specialists with HoneyHive tracing    |
+| `evaluate.py`      | Runs the same agent against a small dataset and scores outputs with HoneyHive experiments |
+| `requirements.txt` | Python dependencies for the cookbook                                                      |
+
 
 ## Architecture
 
@@ -49,7 +51,7 @@ git clone https://github.com/honeyhiveai/cookbook.git
 cd cookbook/google-adk-cookbook
 ```
 
-2. Create a virtual environment and install dependencies:
+1. Create a virtual environment and install dependencies:
 
 ```bash
 uv venv
@@ -61,7 +63,7 @@ This keeps the cookbook on the HoneyHive beta SDK release line while installing 
 
 The current setup uses LiteLLM so ADK can call OpenAI models with your existing `OPENAI_API_KEY`.
 
-3. Create a `.env` file:
+1. Create a `.env` file:
 
 ```bash
 HH_API_KEY=your-honeyhive-api-key
@@ -78,7 +80,7 @@ OPENAI_API_KEY=your-openai-key
 uv run python main.py
 ```
 
-This sends three customer queries through the multi-agent system. In HoneyHive, you'll see:
+This sends one customer query through the multi-agent system. In HoneyHive, you'll see:
 
 - Coordinator routing decisions
 - Sub-agent delegation and tool calls
@@ -91,22 +93,25 @@ This sends three customer queries through the multi-agent system. In HoneyHive, 
 uv run python evaluate.py
 ```
 
-This runs eight test queries through the agent and evaluates:
+This runs four test queries through the agent and evaluates:
 
 - `response_quality`: LLM-as-judge scoring for helpfulness, accuracy, and tone
 - `correct_routing`: exact verification that ADK delegated to the expected specialist based on observed event authors
 
 ## What HoneyHive adds
 
-| Capability | Code | Value |
-|-----------|------|-------|
+
+| Capability   | Code                                                 | Value                                                          |
+| ------------ | ---------------------------------------------------- | -------------------------------------------------------------- |
 | Auto-tracing | `HoneyHiveTracer.init()` + `GoogleADKInstrumentor()` | Captures agent runs, model calls, and tool calls automatically |
-| Enrichment | `tracer.enrich_session(...)` | Adds user, plan, and environment metadata to traces |
-| Custom spans | `@trace()` on `load_customer_context()` | Captures your own business logic alongside framework spans |
-| Evaluation | `evaluate()` | Measures quality over a repeatable dataset |
+| Enrichment   | `tracer.enrich_session(...)`                         | Adds user, plan, and environment metadata to traces            |
+| Custom spans | `@trace()` on `load_customer_context()`              | Captures your own business logic alongside framework spans     |
+| Evaluation   | `evaluate()`                                         | Measures quality over a repeatable dataset                     |
+
 
 ## Resources
 
 - [HoneyHive Docs](https://docs.honeyhive.ai)
 - [Google ADK Docs](https://google.github.io/adk-docs/)
 - [ADK Multi-Agent Systems](https://google.github.io/adk-docs/agents/multi-agents/)
+
