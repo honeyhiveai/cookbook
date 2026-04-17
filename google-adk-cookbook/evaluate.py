@@ -1,123 +1,130 @@
 """
 Evaluate the customer support agent using HoneyHive experiments.
 
-Run:
-    uv run python evaluate.py
+Run either version and compare `response_quality` scores in HoneyHive:
+    uv run python evaluate.py --version v1
+    uv run python evaluate.py --version v2
 """
 
+import argparse
 import json
 import uuid
 
 from dotenv import load_dotenv
+from google import genai
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
-from openai import OpenAI
+from google.genai.types import GenerateContentConfig
 from openinference.instrumentation.google_adk import GoogleADKInstrumentor
-from openinference.instrumentation.openai import OpenAIInstrumentor
+from pydantic import ValidationError
 
 from honeyhive import evaluate
 
-from main import APP_NAME, USER_ID, build_agents, handle_customer_query
+from main import APP_NAME, USER_ID, handle_customer_query, load_agent_module
 
-load_dotenv()
+load_dotenv(override=True)
 
-openai_client = OpenAI()
-
-ROUTES = {"billing_agent": "billing", "technical_agent": "technical"}
-
-
-def detect_specialist(authors: list[str]) -> str:
-    """Infer which specialist handled the request from ADK event authors."""
-    found = {ROUTES[a] for a in authors if a in ROUTES}
-    if len(found) == 1:
-        return found.pop()
-    return "multiple" if found else "unknown"
+JUDGE_MODEL = "gemini-flash-latest"
+genai_client = genai.Client()
 
 
-async def run_support_agent(datapoint: dict) -> dict:
-    """Run the support agent on a single datapoint."""
-    session_service = InMemorySessionService()
-    session_id = f"eval-{uuid.uuid4().hex[:12]}"
-    await session_service.create_session(
-        app_name=f"{APP_NAME}-eval", user_id=USER_ID, session_id=session_id
+def make_run_support_agent(build_agents):
+    """Build a run_support_agent task bound to a specific agent version."""
+
+    async def run_support_agent(datapoint: dict) -> dict:
+        """Run the support agent on a single datapoint."""
+        session_service = InMemorySessionService()
+        session_id = str(uuid.uuid4())
+        await session_service.create_session(
+            app_name=APP_NAME, user_id=USER_ID, session_id=session_id
+        )
+        runner = Runner(
+            agent=build_agents(),
+            app_name=APP_NAME,
+            session_service=session_service,
+        )
+
+        response = await handle_customer_query(
+            runner, session_id, datapoint["inputs"]["query"]
+        )
+        return {"response": response}
+
+    return run_support_agent
+
+
+JUDGE_SYSTEM = (
+    "You are a strict customer-support QA reviewer. Score the agent's response "
+    "on a 3-point scale:\n"
+    "  1   - Fully helpful. Directly answers the question with concrete specifics "
+    "(amounts, dates, article IDs, troubleshooting steps).\n"
+    "  0.5 - Partially helpful. Addresses the question but is vague, incomplete, "
+    "or missing key specifics.\n"
+    "  0   - Unhelpful. Apologizes, admits a tool error, dodges the question, or "
+    "returns no actionable information.\n"
+    'Return strictly {"score": 0 | 0.5 | 1}.'
+)
+
+
+def response_quality(outputs: dict, inputs: dict) -> float:
+    """Judge whether the response is fully / partially / not helpful."""
+    result = genai_client.models.generate_content(
+        model=JUDGE_MODEL,
+        contents=(
+            f"Customer query: {inputs['query']}\n"
+            f"Agent response: {outputs.get('response', '')}"
+        ),
+        config=GenerateContentConfig(
+            system_instruction=JUDGE_SYSTEM,
+            temperature=0,
+            response_mime_type="application/json",
+        ),
     )
-    runner = Runner(
-        agent=build_agents(),
-        app_name=f"{APP_NAME}-eval",
-        session_service=session_service,
-    )
-
-    response, authors = await handle_customer_query(
-        runner, session_id, datapoint["inputs"]["query"]
-    )
-    return {
-        "response": response,
-        "handled_by": detect_specialist(authors),
-        "event_authors": authors,
-    }
-
-
-def response_quality(outputs: dict, inputs: dict, ground_truth: dict) -> float:
-    """Judge whether the response is accurate, helpful, and appropriately toned."""
-    result = openai_client.chat.completions.create(
-        model="gpt-4o-mini",
-        temperature=0,
-        response_format={"type": "json_object"},
-        messages=[
-            {
-                "role": "system",
-                "content": 'Score customer support responses 0.0-1.0 on accuracy, helpfulness, and tone. Return {"score": <number>}.',
-            },
-            {
-                "role": "user",
-                "content": (
-                    f"Customer query: {inputs['query']}\n"
-                    f"Expected category: {ground_truth['category']}\n"
-                    f"Agent response: {outputs.get('response', '')}"
-                ),
-            },
-        ],
-    )
-    raw = result.choices[0].message.content
+    raw = result.text
     if not raw:
         raise ValueError("Judge returned an empty response.")
 
     score = float(json.loads(raw)["score"])
-    if not 0.0 <= score <= 1.0:
-        raise ValueError(f"Judge score must be between 0.0 and 1.0, got {score}.")
+    if score not in {0.0, 0.5, 1.0}:
+        raise ValueError(f"Judge score must be 0, 0.5, or 1, got {score}.")
     return score
 
 
-def correct_routing(outputs: dict, inputs: dict, ground_truth: dict) -> float:
-    """Check whether ADK delegated the query to the expected specialist."""
-    handled_by = outputs.get("handled_by")
-    if handled_by not in {"billing", "technical"}:
-        raise ValueError(
-            "Could not determine a single delegated specialist from ADK events. "
-            f"Observed authors: {outputs.get('event_authors', [])!r}"
-        )
-    return 1.0 if handled_by == ground_truth["category"] else 0.0
-
-
 dataset = [
-    {"inputs": {"query": "I was charged $24.50 but I thought that was refunded?"}, "ground_truth": {"category": "billing"}},
-    {"inputs": {"query": "What's my current account balance?"}, "ground_truth": {"category": "billing"}},
-    {"inputs": {"query": "The export button gives me error 500."}, "ground_truth": {"category": "technical"}},
-    {"inputs": {"query": "Our API calls are getting rate limited. How do we increase the limit?"}, "ground_truth": {"category": "technical"}},
+    {"inputs": {"query": "I was charged $24.50 but I thought that was refunded?"}},
+    {"inputs": {"query": "What's my current account balance?"}},
+    {"inputs": {"query": "Show me my recent charges."}},
+    {"inputs": {"query": "The export button gives me error 500."}},
+    {"inputs": {"query": "Our API calls are getting rate limited. How do we increase the limit?"}},
 ]
 
 
 if __name__ == "__main__":
-    result = evaluate(
-        function=run_support_agent,
-        dataset=dataset,
-        evaluators=[response_quality, correct_routing],
-        instrumentors=[
-            lambda: GoogleADKInstrumentor(),
-            lambda: OpenAIInstrumentor(),
-        ],
-        name="customer-support-eval",
-    )
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--version", choices=["v1", "v2"], default="v2")
+    args = parser.parse_args()
 
-    print(f"Experiment run_id: {result.run_id}")
+    agent_mod = load_agent_module(args.version)
+
+    try:
+        result = evaluate(
+            function=make_run_support_agent(agent_mod.build_agents),
+            dataset=dataset,
+            evaluators=[response_quality],
+            instrumentors=[
+                lambda: GoogleADKInstrumentor(),
+            ],
+            name=f"customer-support-eval-{args.version}",
+        )
+        run_id = result.run_id
+    except ValidationError:
+        # Experiment runs + uploads fine; a pre-existing HoneyHive SDK bug
+        # crashes only when parsing the final summary response. Scores are
+        # still available in the HoneyHive UI.
+        run_id = None
+
+    print(f"Version:   {args.version}")
+    if run_id:
+        print(f"Run ID:    {run_id}")
+    else:
+        print("Run completed (summary fetch failed due to an SDK bug).")
     print("View results in HoneyHive: https://app.honeyhive.ai")

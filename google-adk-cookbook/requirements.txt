@@ -1,7 +1,5 @@
 honeyhive>=1.0.0rc0
 google-adk>=1.0.0
-litellm
+google-genai
 openinference-instrumentation-google-adk
-openinference-instrumentation-openai
 python-dotenv
-openai
