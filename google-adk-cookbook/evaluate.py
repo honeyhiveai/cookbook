@@ -124,4 +124,6 @@ if __name__ == "__main__":
     print(f"Version:   {args.version}")
     if run_id:
         print(f"Run ID:    {run_id}")
+    else:
+        print("Run completed.")
     print("View aggregate scores and traces in HoneyHive: https://app.honeyhive.ai")
