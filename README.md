@@ -10,6 +10,7 @@ Integration examples for AI observability and evaluation with HoneyHive.
 
 | Cookbook | Description |
 |----------|-------------|
+| [google-adk-cookbook](./google-adk-cookbook) | Multi-agent customer support example with Google ADK, HoneyHive tracing, and evaluation |
 | [wealth-management-agent](./wealth-management-agent) | Multi-agent wealth advisory platform with HoneyHive tracing (CrewAI) |
 
 ### RAG & Vector Databases
