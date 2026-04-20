@@ -118,6 +118,9 @@ if __name__ == "__main__":
         )
         run_id = result.run_id
     except ValidationError:
+        # The current pre-release SDK mistypes the run-summary response,
+        # so the final aggregate parse raises after the run has already
+        # uploaded. Remove this once the pinned SDK version is bumped.
         pass
 
     print(f"Version:   {args.version}")
