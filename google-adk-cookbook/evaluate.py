@@ -117,14 +117,11 @@ if __name__ == "__main__":
         )
         run_id = result.run_id
     except ValidationError:
-        # Experiment runs + uploads fine; a pre-existing HoneyHive SDK bug
-        # crashes only when parsing the final summary response. Scores are
-        # still available in the HoneyHive UI.
+        # The run uploads successfully; only the client-side aggregate parse
+        # fails on the current SDK. Scores are visible in the HoneyHive UI.
         run_id = None
 
     print(f"Version:   {args.version}")
     if run_id:
         print(f"Run ID:    {run_id}")
-    else:
-        print("Run completed (summary fetch failed due to an SDK bug).")
-    print("View results in HoneyHive: https://app.honeyhive.ai")
+    print("View aggregate scores and traces in HoneyHive: https://app.honeyhive.ai")
