@@ -114,7 +114,6 @@ In HoneyHive, open the two runs (`customer-support-eval-v1` and `customer-suppor
 ## Implementation notes
 
 - **`max_llm_calls=15`**: `main.py` caps agent iterations via `RunConfig` so a confused agent fails fast instead of looping through many tool-call retries. When the v1 agent exhausts the cap it returns a clear `[agent gave up: ...]` response that the judge correctly scores as 0.
-- **HoneyHive summary fetch**: on the current pre-release SDK, the client-side aggregate parse at the end of `evaluate()` can raise a `pydantic.ValidationError`. The run itself uploads successfully, so `evaluate.py` catches the error and points you at the HoneyHive UI for the scores. This will go away once we pin a newer SDK release.
 
 ## What HoneyHive adds
 

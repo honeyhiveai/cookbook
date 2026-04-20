@@ -16,7 +16,6 @@ from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai.types import GenerateContentConfig
 from openinference.instrumentation.google_adk import GoogleADKInstrumentor
-from pydantic import ValidationError
 
 from honeyhive import evaluate
 
@@ -105,23 +104,16 @@ if __name__ == "__main__":
 
     agent_mod = load_agent_module(args.version)
 
-    try:
-        result = evaluate(
-            function=make_run_support_agent(agent_mod.build_agents),
-            dataset=dataset,
-            evaluators=[response_quality],
-            instrumentors=[
-                lambda: GoogleADKInstrumentor(),
-            ],
-            name=f"customer-support-eval-{args.version}",
-        )
-        run_id = result.run_id
-    except ValidationError:
-        # The run uploads successfully; only the client-side aggregate parse
-        # fails on the current SDK. Scores are visible in the HoneyHive UI.
-        run_id = None
+    result = evaluate(
+        function=make_run_support_agent(agent_mod.build_agents),
+        dataset=dataset,
+        evaluators=[response_quality],
+        instrumentors=[
+            lambda: GoogleADKInstrumentor(),
+        ],
+        name=f"customer-support-eval-{args.version}",
+    )
 
     print(f"Version:   {args.version}")
-    if run_id:
-        print(f"Run ID:    {run_id}")
+    print(f"Run ID:    {result.run_id}")
     print("View aggregate scores and traces in HoneyHive: https://app.honeyhive.ai")
