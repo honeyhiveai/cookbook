@@ -40,6 +40,10 @@ def calculator(expression: str) -> str:
     allowed = set("0123456789+-*/(). ")
     if not expression or set(expression) - allowed:
         return "error: only digits and + - * / ( ) . are allowed"
+    # Reject `**` — the char allowlist permits `*`, so `9**9**9` would slip through
+    # and exhaust CPU/memory inside eval. Demo tool doesn't need exponentiation.
+    if "**" in expression:
+        return "error: exponentiation not allowed"
     try:
         return str(eval(expression, {"__builtins__": {}}, {}))  # noqa: S307 — input is whitelisted above
     except Exception as exc:
