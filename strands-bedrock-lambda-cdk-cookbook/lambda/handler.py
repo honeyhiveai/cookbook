@@ -78,9 +78,19 @@ except Exception as exc:
     _INIT_ERROR = f"{type(exc).__name__}: {exc}"
 
 
+def _error_response(status: int, message: str, detail: str | None) -> dict:
+    # API Gateway v2 payload format 2.0: without an explicit statusCode, plain
+    # dicts are returned as HTTP 200 — so error paths must wrap themselves.
+    return {
+        "statusCode": status,
+        "headers": {"content-type": "application/json"},
+        "body": json.dumps({"error": message, "detail": detail}),
+    }
+
+
 def handler(event, context):
     if _INIT_ERROR or _tracer is None or _agent is None:
-        return {"error": "cold-start init failed", "detail": _INIT_ERROR}
+        return _error_response(500, "cold-start init failed", _INIT_ERROR)
 
     # HTTP API v2 delivers the POST body as a JSON string in event["body"];
     # direct Lambda invokes put keys at the event root. Support both.
@@ -107,10 +117,9 @@ def handler(event, context):
             response_text = str(result)
             _tracer.enrich_session(outputs={"response": response_text})
     except Exception as exc:
-        return {
-            "error": "agent invocation failed",
-            "detail": f"{type(exc).__name__}: {exc}",
-        }
+        return _error_response(
+            500, "agent invocation failed", f"{type(exc).__name__}: {exc}"
+        )
 
     session_url = (
         f"{HONEYHIVE_APP_URL}/{HONEYHIVE_PROJECT}/sessions/{session_id}"

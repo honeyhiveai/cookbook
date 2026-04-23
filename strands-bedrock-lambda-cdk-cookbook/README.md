@@ -15,6 +15,7 @@ Deploy a [Strands](https://strandsagents.com) agent that calls AWS Bedrock from 
 - **AWS CLI** configured with credentials that can create Lambda, IAM roles, API Gateway, and Secrets Manager resources: `aws configure`.
 - **Node.js 18+** so you can run the CDK CLI (`npm i -g aws-cdk`, or prefix every `cdk` command with `npx --yes`).
 - **Python 3.12** — the Lambda runtime is pinned to 3.12, so match it locally to avoid native-wheel surprises at build time.
+- **Docker** running locally — `cdk deploy` bundles the Lambda's Python dependencies inside the official AWS Lambda Python 3.12 image, so the Docker daemon must be up before you deploy.
 - **AWS Bedrock model access.** Claude and Nova models require separate access grants in the Bedrock console (*Model access* → *Manage model access*). Grant access before deploying.
 - **A HoneyHive project + API key.** Create them at [app.honeyhive.ai](https://app.honeyhive.ai) and keep the key handy for step 4. See the [HoneyHive quickstart](https://docs.honeyhive.ai/introduction/quickstart) if you need a walkthrough.
 

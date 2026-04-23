@@ -1,4 +1,5 @@
 from aws_cdk import (
+    BundlingOptions,
     CfnOutput,
     Duration,
     RemovalPolicy,
@@ -60,7 +61,23 @@ class StrandsBedrockLambdaStack(Stack):
             architecture=lambda_.Architecture.ARM_64,
             memory_size=512,
             timeout=Duration.seconds(60),
-            code=lambda_.Code.from_asset("lambda"),
+            code=lambda_.Code.from_asset(
+                "lambda",
+                bundling=BundlingOptions(
+                    # Docker-based bundling: CDK pulls the matching Lambda Python
+                    # image, pip-installs requirements.txt into /asset-output, and
+                    # copies the handler alongside. Without this, Code.from_asset
+                    # would ship only the source files and Lambda would crash on
+                    # import of honeyhive / strands-agents.
+                    image=lambda_.Runtime.PYTHON_3_12.bundling_image,
+                    command=[
+                        "bash",
+                        "-c",
+                        "pip install -r requirements.txt -t /asset-output "
+                        "&& cp -au . /asset-output",
+                    ],
+                ),
+            ),
             handler="handler.handler",
             environment=environment,
             log_group=log_group,
