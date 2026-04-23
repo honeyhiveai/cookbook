@@ -8,10 +8,17 @@ Three patterns matter here; a reader poking at this later should know why:
    `converse()` accepts foundation-model IDs, regular inference-profile ARNs,
    and application-inference-profile ARNs interchangeably, so one code path
    handles all three shapes.
-3. Session id is attached via `tracer.with_session()` (OTEL baggage), NOT
-   `session_start()`. `session_start()` stores session_id on the tracer
-   singleton, which bleeds between invocations when Lambda reuses a container.
-   `with_session()` uses a ContextVar and cleans up on scope exit.
+3. Per-invocation state must be reset — two things bleed across container reuse
+   if you're not careful:
+   (a) session id: use `tracer.with_session()` (OTEL baggage, ContextVar-based,
+       auto-cleanup on scope exit), NOT `session_start()` which stores on the
+       tracer singleton. This is the rc10 fix from customer-nationwide
+       2025-10-28.
+   (b) agent conversation history: the Strands `Agent` accumulates user and
+       assistant turns in `self.messages`. Since `_agent` is the same singleton
+       across warm invocations, invocation N would otherwise see the full
+       history from invocations 1..N-1 — a privacy leak and an ever-growing
+       token bill. Clear `_agent.messages` at the start of each invocation.
 """
 
 from __future__ import annotations
@@ -76,6 +83,9 @@ def handler(event, context):
 
     prompt = (event or {}).get("prompt") or "What is 17 * 23?"
     session_name = f"lambda-{uuid.uuid4().hex[:8]}"
+
+    # Reset per-invocation agent state — see module docstring, item 3(b)
+    _agent.messages.clear()
 
     try:
         with _tracer.with_session(
