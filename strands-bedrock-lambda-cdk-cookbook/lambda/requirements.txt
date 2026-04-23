@@ -1,0 +1,6 @@
+# Lambda runtime deps — bundled into the Lambda deployment package by CDK.
+# Keep this separate from the repo-root requirements.txt, which is CDK-synth deps only.
+
+strands-agents>=1.0.0,<2.0.0
+honeyhive>=1.0.0rc20  # Pin to be tightened in HHAI-4970 once the rc with Strands event_type priority lands
+boto3>=1.34.0
