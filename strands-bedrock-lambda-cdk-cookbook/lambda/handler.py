@@ -23,6 +23,7 @@ Three patterns matter here; a reader poking at this later should know why:
 
 from __future__ import annotations
 
+import json
 import os
 import uuid
 
@@ -81,7 +82,18 @@ def handler(event, context):
     if _INIT_ERROR or _tracer is None or _agent is None:
         return {"error": "cold-start init failed", "detail": _INIT_ERROR}
 
-    prompt = (event or {}).get("prompt") or "What is 17 * 23?"
+    # HTTP API v2 delivers the POST body as a JSON string in event["body"];
+    # direct Lambda invokes put keys at the event root. Support both.
+    event = event or {}
+    body_raw = event.get("body")
+    if isinstance(body_raw, str) and body_raw:
+        try:
+            body = json.loads(body_raw)
+        except json.JSONDecodeError:
+            body = {}
+    else:
+        body = {}
+    prompt = body.get("prompt") or event.get("prompt") or "What is 17 * 23?"
     session_name = f"lambda-{uuid.uuid4().hex[:8]}"
 
     # Reset per-invocation agent state — see module docstring, item 3(b)
