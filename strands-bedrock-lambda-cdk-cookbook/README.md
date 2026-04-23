@@ -17,3 +17,7 @@ npx --yes cdk synth
 ```
 
 `cdk synth` emits CloudFormation to `cdk.out/`. The stack currently synthesizes empty; resources land in follow-up PRs.
+
+## Version pins
+
+`lambda/requirements.txt` uses exact pins — reproducibility over flexibility. The HoneyHive SDK is pinned to `1.0.0rc21` because it's the earliest rc with both the session_id baggage isolation (prevents warm-Lambda session bleed across users) and the event_type priority detection that routes Strands GenAI ops (`invoke_agent` → chain, `execute_tool` → tool, `chat` → model) instead of falling through to the generic `tool` default. See the header of `lambda/requirements.txt` for the full rationale.

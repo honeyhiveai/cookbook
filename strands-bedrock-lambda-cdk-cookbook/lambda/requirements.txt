@@ -1,6 +1,29 @@
 # Lambda runtime deps — bundled into the Lambda deployment package by CDK.
 # Keep this separate from the repo-root requirements.txt, which is CDK-synth deps only.
+#
+# Exact pins (HHAI-4970). This is a hackathon template — reproducibility matters
+# more than flexibility. Why these versions:
+#
+#   honeyhive==1.0.0rc21
+#     - session_id baggage isolation (rc10+): get_baggage("honeyhive.session_id")
+#       in tracer/core/operations.py prevents warm-Lambda session bleed across
+#       users (customer-nationwide, 2025-10-28).
+#     - event_type priority detection in HoneyHiveSpanProcessor: raw >
+#       honeyhive_event_type > gen_ai.operation.name > openinference.span.kind >
+#       span-name patterns. Maps Strands GenAI ops (invoke_agent → chain,
+#       execute_tool → tool, chat → model) so Strands spans are categorized
+#       correctly instead of falling through to the default "tool". SDK-side
+#       complement to hive-kube#3239.
+#     - application-inference-profile ARNs: handled transparently by boto3 +
+#       Bedrock converse(); no SDK-side change needed.
+#
+#   strands-agents==1.26.0
+#     Version the handler was authored/tested against.
+#
+#   boto3==1.42.47
+#     Pinned for reproducibility. Lambda runtime provides its own boto3, but an
+#     exact pin keeps the deployed layer deterministic.
 
-strands-agents>=1.0.0,<2.0.0
-honeyhive>=1.0.0rc20  # Pin to be tightened in HHAI-4970 once the rc with Strands event_type priority lands
-boto3>=1.34.0
+honeyhive==1.0.0rc21
+strands-agents==1.26.0
+boto3==1.42.47
