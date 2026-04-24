@@ -1,52 +1,39 @@
 /**
  * transcriptsEval.js
- * 
- * This script demonstrates how to use HoneyHive's evaluation framework to
- * systematically evaluate the performance of an insurance call transcript
- * summarization system.
- * 
- * The script uses Azure OpenAI to generate summaries from call transcripts and
- * evaluates these summaries against a dataset stored in HoneyHive.
+ *
+ * Evaluates the insurance call transcript summarization system using
+ * HoneyHive's evaluation framework with Azure OpenAI.
  */
 
 import { evaluate } from "honeyhive";
 import { AzureOpenAI } from "openai";
 
-// Azure OpenAI configuration
-// NOTE: These are placeholder values - replace with your actual credentials
-const endpoint = "https://your-azure-openai-endpoint.openai.azure.com/";
-const apiKey = "your-azure-openai-api-key";
-const apiVersion = "2024-05-01-preview";
-const deployment = "gpt-4o-mini";
+// Azure OpenAI configuration from environment variables
+const endpoint = process.env.AZURE_OPENAI_ENDPOINT || "https://your-azure-openai-endpoint.openai.azure.com/";
+const apiKey = process.env.AZURE_OPENAI_API_KEY || "";
+const apiVersion = "2024-10-21";
+const deployment = process.env.AZURE_OPENAI_DEPLOYMENT || "gpt-4o-mini";
 
 /**
- * Function to summarize a transcript
- * 
- * This function takes input from the evaluation framework, generates a summary
- * using Azure OpenAI, and returns the summary along with metadata for analysis.
- * 
- * @param {Object} input - Object containing the transcript to summarize
- * @returns {Object} Object containing the summary and metadata
+ * Summarize a transcript for evaluation
  */
 export async function summarizeTranscript(input) {
   try {
-    // Initialize Azure OpenAI client
-    const client = new AzureOpenAI({ 
-      endpoint, 
+    const client = new AzureOpenAI({
+      endpoint,
       apiKey,
       apiVersion,
-      deployment 
+      deployment,
     });
 
-    // Prepare the prompt template
     const openaiFormatTemplate = [
       {
-        "role": "system",
-        "content": "You are an AI assistant that helps insurance agents summarize call transcripts."
+        role: "system",
+        content: "You are an AI assistant that helps insurance agents summarize call transcripts.",
       },
       {
-        "role": "user",
-        "content": `
+        role: "user",
+        content: `
 You are an expert insurance claims analyst. Please summarize the following claims call transcript into key points:
 
 1. Customer information
@@ -57,37 +44,34 @@ You are an expert insurance claims analyst. Please summarize the following claim
 Transcript:
 ${input.transcript}
 
-Please provide a concise summary with the most important information.`
-      }
+Please provide a concise summary with the most important information.`,
+      },
     ];
 
-    // Define hyperparameters for the model
     const hyperparams = {
       temperature: 0.3,
       max_tokens: 500,
       top_p: 0.95,
       frequency_penalty: 0,
-      presence_penalty: 0
+      presence_penalty: 0,
     };
 
-    // Generate the summary
     const result = await client.chat.completions.create({
       messages: openaiFormatTemplate,
       ...hyperparams,
-      model: "", // Model is specified by the deployment ID in Azure
+      model: "",
     });
 
-    // Return the summary and metadata
     return {
       summary: result.choices[0].message.content,
       metadata: {
         tokenCount: {
           promptTokens: result.usage?.prompt_tokens || 0,
           completionTokens: result.usage?.completion_tokens || 0,
-          totalTokens: result.usage?.total_tokens || 0
+          totalTokens: result.usage?.total_tokens || 0,
         },
-        model: deployment
-      }
+        model: deployment,
+      },
     };
   } catch (error) {
     console.error("Error summarizing transcript:", error);
@@ -97,28 +81,21 @@ Please provide a concise summary with the most important information.`
 
 /**
  * Main function to run the evaluation
- * 
- * This function sets up and executes the HoneyHive evaluation framework on
- * the transcript summarization function using a predefined dataset.
  */
 async function main() {
   try {
-    // Run the evaluation using HoneyHive's evaluate framework
-    // NOTE: This is a placeholder API key - replace with your actual HoneyHive API key
     await evaluate({
       evaluationFunction: summarizeTranscript,
-      hh_api_key: "your-honeyhive-api-key",
-      hh_project: "your-honeyhive-project-name",
+      hh_api_key: process.env.HH_API_KEY,
+      hh_project: process.env.HH_PROJECT || "Claims Transcript Summary",
       name: "Claims Transcript Summary Eval",
-      dataset_id: "your-dataset-id", // Replace with your actual dataset ID
-      //server_url: "https://api.honeyhive.ai" //Optional, only required for self-hosted or dedicated-cloud deployments
+      dataset_id: "your-dataset-id", // Replace with your actual HoneyHive dataset ID
     });
-    
+
     console.log("Experiment completed successfully!");
   } catch (error) {
     console.error("Error running experiment:", error);
   }
 }
 
-// Execute the main function if this script is run directly
 main();

@@ -1,24 +1,20 @@
 /**
  * transcriptsTrace.js
- * 
- * This script demonstrates how to use HoneyHive's tracing capabilities to monitor 
- * and analyze the performance of an insurance claim call transcript summarization system.
- * 
- * The script uses Azure OpenAI to generate summaries from call transcripts and
- * traces the execution using HoneyHive for observability.
+ *
+ * Demonstrates HoneyHive tracing for an insurance claim call transcript
+ * summarization system using Azure OpenAI.
  */
 
 import { AzureOpenAI } from "openai";
 import { HoneyHiveTracer } from "honeyhive";
 
-// Azure OpenAI configuration
-// NOTE: These are placeholder values - replace with your actual credentials
-const endpoint = "https://your-azure-openai-endpoint.openai.azure.com/";
-const apiKey = "your-azure-openai-api-key";
-const apiVersion = "2024-05-01-preview";
-const deployment = "gpt-4o-mini";
+// Azure OpenAI configuration from environment variables
+const endpoint = process.env.AZURE_OPENAI_ENDPOINT || "https://your-azure-openai-endpoint.openai.azure.com/";
+const apiKey = process.env.AZURE_OPENAI_API_KEY || "";
+const apiVersion = "2024-10-21";
+const deployment = process.env.AZURE_OPENAI_DEPLOYMENT || "gpt-4o-mini";
 
-// Example transcript for testing purposes
+// Example transcript for testing
 const exampleTranscript = `
 CALL TRANSCRIPT - CLAIM #AC78394D
 DATE: 2024-02-15
@@ -95,30 +91,24 @@ CUSTOMER: You too. Goodbye.
 
 /**
  * Core function to summarize transcripts using Azure OpenAI
- * 
- * @param {string} transcript - The call transcript to summarize
- * @param {Function} enrichSpanCallback - Optional callback to enrich the HoneyHive span with metadata
- * @returns {Object} An object containing the summary, configuration data, and metadata
  */
 async function _summarizeTranscriptCore(transcript, enrichSpanCallback = null) {
   try {
-    // Initialize Azure OpenAI client
-    const client = new AzureOpenAI({ 
-      endpoint, 
+    const client = new AzureOpenAI({
+      endpoint,
       apiKey,
       apiVersion,
-      deployment 
+      deployment,
     });
 
-    // Prepare the prompt template
     const openaiFormatTemplate = [
       {
-        "role": "system",
-        "content": "You are an AI assistant that helps insurance agents summarize call transcripts."
+        role: "system",
+        content: "You are an AI assistant that helps insurance agents summarize call transcripts.",
       },
       {
-        "role": "user",
-        "content": `
+        role: "user",
+        content: `
 You are an expert insurance claims analyst. Please summarize the following claims call transcript into key points:
 
 1. Customer information
@@ -129,56 +119,49 @@ You are an expert insurance claims analyst. Please summarize the following claim
 Transcript:
 {{transcript}}
 
-Please provide a concise summary with the most important information.`
-      }
+Please provide a concise summary with the most important information.`,
+      },
     ];
 
-    // Create a deep copy of the template and replace the placeholder with the actual transcript
     const filledMessages = JSON.parse(JSON.stringify(openaiFormatTemplate));
     filledMessages[1].content = filledMessages[1].content.replace("{{transcript}}", transcript);
 
-    // Define hyperparameters for the model
     const hyperparams = {
       temperature: 0.3,
       max_tokens: 500,
       top_p: 0.95,
       frequency_penalty: 0,
-      presence_penalty: 0
+      presence_penalty: 0,
     };
 
-    // Generate the summary
     const result = await client.chat.completions.create({
       messages: filledMessages,
       ...hyperparams,
-      model: "", // Model is specified by the deployment ID in Azure
+      model: "",
     });
 
-    // Prepare configuration data for tracing
     const configData = {
       model: deployment,
       template: openaiFormatTemplate,
-      hyperparameters: hyperparams
+      hyperparameters: hyperparams,
     };
-    
-    // Prepare metadata for tracing
+
     const metadataData = {
       tokenCount: {
         promptTokens: result.usage?.prompt_tokens || 0,
         completionTokens: result.usage?.completion_tokens || 0,
-        totalTokens: result.usage?.total_tokens || 0
-      }
+        totalTokens: result.usage?.total_tokens || 0,
+      },
     };
 
-    // Enrich the HoneyHive span with config and metadata if callback is provided
-    if (enrichSpanCallback && typeof enrichSpanCallback === 'function') {
+    if (enrichSpanCallback && typeof enrichSpanCallback === "function") {
       enrichSpanCallback(configData, metadataData);
     }
 
-    // Return the result
     return {
       summary: result.choices[0].message.content,
       configData,
-      metadataData
+      metadataData,
     };
   } catch (error) {
     console.error("Error summarizing transcript:", error);
@@ -187,10 +170,7 @@ Please provide a concise summary with the most important information.`
 }
 
 /**
- * Function to summarize a single transcript
- * 
- * @param {string} transcript - The call transcript to summarize
- * @returns {string} The generated summary
+ * Summarize a single transcript
  */
 async function summarizeTranscript(transcript) {
   const result = await _summarizeTranscriptCore(transcript);
@@ -198,61 +178,53 @@ async function summarizeTranscript(transcript) {
 }
 
 /**
- * Function to process multiple transcripts
- * 
- * @param {Array} transcripts - An array of transcript objects
- * @returns {Array} An array of objects containing transcript IDs and summaries
+ * Process multiple transcripts
  */
 async function processTranscripts(transcripts) {
   const results = [];
-  
+
   for (const transcript of transcripts) {
     const result = await _summarizeTranscriptCore(transcript);
     results.push({
-      transcript_id: transcript.id || 'unknown',
-      summary: result.summary
+      transcript_id: transcript.id || "unknown",
+      summary: result.summary,
     });
   }
-  
+
   return results;
 }
 
 /**
- * Main function to demonstrate the use of HoneyHive tracing
+ * Main function demonstrating HoneyHive tracing
  */
 async function main() {
   try {
-    // Initialize HoneyHive tracer
-    // NOTE: This is a placeholder API key - replace with your actual HoneyHive API key
     const tracer = await HoneyHiveTracer.init({
-      apiKey: "your-honeyhive-api-key",
-      project: "your-honeyhive-project-name",
+      apiKey: process.env.HH_API_KEY,
+      project: process.env.HH_PROJECT || "Claims Transcript Summary",
       source: "dev",
       sessionName: "Claims Transcript Summary",
-      //serverUrl: "https://api.honeyhive.ai" //Optional, only required for self-hosted or dedicated-cloud deployments
     });
 
-    // Create a traced version of the summarizeTranscript function
-    const tracedSummarizeTranscript = tracer.traceFunction({eventType: "model"})(
+    const tracedSummarizeTranscript = tracer.traceFunction({ eventType: "model" })(
       async function summarizeTranscript(transcript) {
         const result = await _summarizeTranscriptCore(transcript, (configData, metadataData) => {
           tracer.enrichSpan({
             config: configData,
-            metadata: metadataData
+            metadata: metadataData,
           });
         });
-        
+
         return result.summary;
       }
     );
 
-    // Execute the traced function within a trace context
     await tracer.trace(async () => {
       console.log("Processing example transcript...");
       console.log("=================================");
-      
+
       const summary = await tracedSummarizeTranscript(exampleTranscript);
-      
+
       console.log("\n=== EXAMPLE TRANSCRIPT SUMMARY ===\n");
       console.log(summary);
       console.log("\n=================================\n");
@@ -262,8 +234,6 @@ async function main() {
   }
 }
 
-// Execute the main function if this script is run directly
 main();
 
-// Export functions for use in other modules
 export { summarizeTranscript, processTranscripts, main };
