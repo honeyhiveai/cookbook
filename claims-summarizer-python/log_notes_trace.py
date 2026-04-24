@@ -23,11 +23,16 @@ Requirements:
 
 """
 
-import boto3
 import json
 import os
-from honeyhive.tracer import HoneyHiveTracer
-from honeyhive.tracer.custom import trace, enrich_span
+
+import boto3
+from dotenv import load_dotenv
+
+from honeyhive import HoneyHiveTracer, enrich_span, trace
+from openinference.instrumentation.bedrock import BedrockInstrumentor
+
+load_dotenv(override=True)
 
 
 class ClaimSummarizer:
@@ -146,19 +151,15 @@ class ClaimSummarizer:
 def init_honeyhive():
     """
     Initialize HoneyHive for model observability.
-    
-    This function sets up the HoneyHive tracer with the appropriate
-    project information and API key.
     """
-    # Initialize HoneyHive with your API key (use environment variables in production)
-    HoneyHiveTracer.init(
-        api_key=os.environ.get("HONEYHIVE_API_KEY", "your_api_key_here"),
-        project="Insurance Claims Summarization",
+    tracer = HoneyHiveTracer.init(
+        api_key=os.getenv("HH_API_KEY"),
+        project=os.getenv("HH_PROJECT", "Insurance Claims Summarization"),
         source="development",
         session_name="Claims Summarizer",
-        # For enterprise deployments, uncomment and use your org's server URL:
-        # server_url='https://[org_name].api.honeyhive.ai' 
     )
+    BedrockInstrumentor().instrument(tracer_provider=tracer.provider)
+    return tracer
 
 
 def main():

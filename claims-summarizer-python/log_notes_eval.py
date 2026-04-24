@@ -27,10 +27,15 @@ Usage:
 4. Run the script
 """
 
-import boto3
 import json
 import os
-from honeyhive import evaluate, enrich_span, trace
+
+import boto3
+from dotenv import load_dotenv
+
+from honeyhive import enrich_span, evaluate, trace
+
+load_dotenv(override=True)
 
 
 class ClaimSummarizer:
@@ -184,33 +189,13 @@ def main():
     This sets up and runs a HoneyHive evaluation experiment against
     a dataset of claim logs.
     """
-    # Get API key from environment variables (recommended approach)
-    hh_api_key = os.environ.get("HONEYHIVE_API_KEY")
-    
-    # If not set in environment, you can set it here (not recommended for production)
-    if not hh_api_key:
-        hh_api_key = "your_honeyhive_api_key"  # Replace with your actual API key
-    
-    # Run the experiment
     evaluate(
         function=summarize_claim,
-        hh_api_key=hh_api_key,
-        hh_project="Insurance Claims Summarization",
+        hh_api_key=os.getenv("HH_API_KEY"),
+        hh_project=os.getenv("HH_PROJECT", "Insurance Claims Summarization"),
         name="Claims Summarizer Evaluation",
-        
-        # IMPORTANT: Replace with your dataset ID from the HoneyHive console
-        dataset_id="your_dataset_id_here",
-        
-        # Add any evaluators you want to use - these should be function references
-        evaluators=[
-            # Example evaluators - uncomment and customize as needed
-            # accuracy_evaluator,     # Custom function you've defined above
-            # relevance_evaluator,    # Another custom evaluation function
-            # lambda x, y: some_evaluation_logic(x, y)  # Or inline lambda functions
-        ],
-        
-        # Uncomment for enterprise deployments with dedicated servers
-        # server_url='https://[org_name].api.honeyhive.ai'
+        dataset_id="your_dataset_id_here",  # Replace with your HoneyHive dataset ID
+        evaluators=[],
     )
 
 
