@@ -6,24 +6,26 @@ This example demonstrates:
 2. Adding custom metrics to traces
 3. Tracing for more complex operations
 """
-import boto3
 import json
 import os
 import time
 import uuid
+
+import boto3
 from dotenv import load_dotenv
+
 from honeyhive import HoneyHiveTracer, trace
+from openinference.instrumentation.bedrock import BedrockInstrumentor
 
-# Load environment variables
-load_dotenv()
+load_dotenv(override=True)
 
-# Initialize HoneyHive tracer
-HoneyHiveTracer.init(
-    api_key=os.getenv("HONEYHIVE_API_KEY"),
-    project="aws-bedrock-examples",
-    source="dev",
-    session_name="advanced-bedrock-tracing"
+# Initialize HoneyHive tracer and Bedrock auto-instrumentation
+tracer = HoneyHiveTracer.init(
+    api_key=os.getenv("HH_API_KEY"),
+    project=os.getenv("HH_PROJECT", "aws-bedrock-examples"),
+    session_name="advanced-bedrock-tracing",
 )
+BedrockInstrumentor().instrument(tracer_provider=tracer.provider)
 
 @trace
 def get_bedrock_model_info(bedrock_client, model_id):

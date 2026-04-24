@@ -1,3 +1,4 @@
-boto3>=1.28.0
-honeyhive>=0.1.0
-python-dotenv>=1.0.0
+honeyhive>=1.0.0rc21
+boto3
+openinference-instrumentation-bedrock
+python-dotenv

@@ -2,27 +2,28 @@
 """
 Lists the available Amazon Bedrock models with HoneyHive tracing.
 """
-import logging
 import json
-import boto3
+import logging
 import os
+
+import boto3
 from dotenv import load_dotenv
+
 from honeyhive import HoneyHiveTracer, trace
+from openinference.instrumentation.bedrock import BedrockInstrumentor
 
-# Load environment variables
-load_dotenv()
+load_dotenv(override=True)
 
-# Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Initialize HoneyHive tracer
-HoneyHiveTracer.init(
-    api_key=os.getenv("HONEYHIVE_API_KEY"),
-    project="aws-bedrock-examples",
-    source="dev",
-    session_name="list-bedrock-models"
+# Initialize HoneyHive tracer and Bedrock auto-instrumentation
+tracer = HoneyHiveTracer.init(
+    api_key=os.getenv("HH_API_KEY"),
+    project=os.getenv("HH_PROJECT", "aws-bedrock-examples"),
+    session_name="list-bedrock-models",
 )
+BedrockInstrumentor().instrument(tracer_provider=tracer.provider)
 
 @trace
 def list_foundation_models(bedrock_client):
