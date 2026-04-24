@@ -2,19 +2,27 @@
 This example demonstrates how to trace basic Azure OpenAI chat completions with HoneyHive.
 """
 import os
-from openai import AzureOpenAI
-from honeyhive import HoneyHiveTracer, trace
 
-# Initialize HoneyHive tracer at the beginning of your application
-HoneyHiveTracer.init(
-    api_key='your-honeyhive-api-key==',  # Replace with your actual HoneyHive API key
-    project='Azure-OpenAI-traces'
+from dotenv import load_dotenv
+from openai import AzureOpenAI
+
+from honeyhive import HoneyHiveTracer, trace
+from openinference.instrumentation.openai import OpenAIInstrumentor
+
+load_dotenv(override=True)
+
+# Initialize HoneyHive tracer and OpenAI auto-instrumentation
+tracer = HoneyHiveTracer.init(
+    api_key=os.getenv("HH_API_KEY"),
+    project=os.getenv("HH_PROJECT", "Azure-OpenAI-traces"),
 )
+OpenAIInstrumentor().instrument(tracer_provider=tracer.provider)
 
 # Initialize Azure OpenAI client
 client = AzureOpenAI(
-    api_version="2023-07-01-preview",
-    azure_endpoint="https://your-endpoint.openai.azure.com",  # Replace with your Azure endpoint
+    api_key=os.getenv("AZURE_OPENAI_API_KEY"),
+    api_version="2024-10-21",
+    azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT", ""),
 )
 
 # Simple function to call Azure OpenAI chat completions API

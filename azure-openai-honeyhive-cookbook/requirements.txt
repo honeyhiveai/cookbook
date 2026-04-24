@@ -1,3 +1,5 @@
-openai>=1.13.0
-honeyhive>=0.2.0
-pydantic>=2.0.0 
+honeyhive>=1.0.0rc21
+openai
+openinference-instrumentation-openai
+pydantic>=2.0.0
+python-dotenv
