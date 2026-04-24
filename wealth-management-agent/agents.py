@@ -4,7 +4,7 @@ Wealth Advisory Specialist Agents
 
 from typing import List
 from crewai import Agent, Task, Crew, Process
-from honeyhive.tracer.custom import trace
+from honeyhive import trace
 from registry import SubTask, AgentCapability, TOOL_REGISTRY
 
 # ---------------------------------------------------------------------------
