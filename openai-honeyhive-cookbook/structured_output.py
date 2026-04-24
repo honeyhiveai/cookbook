@@ -2,21 +2,26 @@
 This example demonstrates how to trace OpenAI structured outputs with HoneyHive.
 """
 import os
-from pydantic import BaseModel, Field
 from typing import List, Optional
-from openai import OpenAI
-from honeyhive import HoneyHiveTracer, trace
 
-# Initialize HoneyHive tracer at the beginning of your application
-HoneyHiveTracer.init(
-    api_key='your-honeyhive-api-key==',  # Replace with your actual HoneyHive API key
-    project='OpenAI-traces'
+from dotenv import load_dotenv
+from openai import OpenAI
+from pydantic import BaseModel, Field
+
+from honeyhive import HoneyHiveTracer, trace
+from openinference.instrumentation.openai import OpenAIInstrumentor
+
+load_dotenv(override=True)
+
+# Initialize HoneyHive tracer and OpenAI auto-instrumentation
+tracer = HoneyHiveTracer.init(
+    api_key=os.getenv("HH_API_KEY"),
+    project=os.getenv("HH_PROJECT", "OpenAI-traces"),
 )
+OpenAIInstrumentor().instrument(tracer_provider=tracer.provider)
 
 # Initialize OpenAI client
-client = OpenAI(
-    api_key='your-openai-key'  # Replace with your actual OpenAI API key
-)
+client = OpenAI()
 
 # Define Pydantic models for structured outputs
 class WeatherInfo(BaseModel):

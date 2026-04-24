@@ -2,20 +2,25 @@
 This example demonstrates how to trace a multi-turn conversation with OpenAI using HoneyHive.
 """
 import os
-from openai import OpenAI
-from honeyhive import HoneyHiveTracer, trace
 
-# Initialize HoneyHive tracer at the beginning of your application
-HoneyHiveTracer.init(
-    api_key='your-honeyhive-api-key==',  # Replace with your actual HoneyHive API key
-    project='OpenAI-traces',
-    session_name="multi_turn_conversation"  # Set a descriptive session name
+from dotenv import load_dotenv
+from openai import OpenAI
+
+from honeyhive import HoneyHiveTracer, trace
+from openinference.instrumentation.openai import OpenAIInstrumentor
+
+load_dotenv(override=True)
+
+# Initialize HoneyHive tracer and OpenAI auto-instrumentation
+tracer = HoneyHiveTracer.init(
+    api_key=os.getenv("HH_API_KEY"),
+    project=os.getenv("HH_PROJECT", "OpenAI-traces"),
+    session_name="multi_turn_conversation",
 )
+OpenAIInstrumentor().instrument(tracer_provider=tracer.provider)
 
 # Initialize OpenAI client
-client = OpenAI(
-    api_key='your-openai-key'  # Replace with your actual OpenAI API key
-)
+client = OpenAI()
 
 class Conversation:
     """
