@@ -1,0 +1,5 @@
+honeyhive>=1.0.0rc21
+openai
+qdrant-client
+openinference-instrumentation-openai
+python-dotenv

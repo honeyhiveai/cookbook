@@ -1,60 +1,74 @@
-# Qdrant Integration Cookbook for HoneyHive
+# Qdrant RAG Pipeline with HoneyHive Tracing
 
-This cookbook demonstrates how to integrate [Qdrant](https://qdrant.tech/) (a vector database) with HoneyHive for observability in Retrieval-Augmented Generation (RAG) pipelines.
+This cookbook demonstrates how to build a Retrieval-Augmented Generation (RAG) pipeline using Qdrant as the vector store, with HoneyHive for end-to-end observability.
 
 ## Overview
 
-Qdrant is an open-source vector database optimized for storing and searching high-dimensional embeddings. In a RAG pipeline, Qdrant serves as the "long-term memory" for your LLM, efficiently managing storage and retrieval of document vectors.
+The example covers:
+- Connecting to Qdrant (local or cloud)
+- Embedding documents with OpenAI
+- Storing and searching vectors in Qdrant
+- Generating answers with context from retrieved documents
+- Tracing the entire RAG pipeline with HoneyHive
 
-This cookbook covers:
-- Setting up Qdrant (both self-hosted and cloud-hosted options)
-- Integrating Qdrant with HoneyHive for observability
-- Building a complete RAG pipeline with Qdrant as the vector store
-- Tracing and monitoring your vector operations
+## Setup
 
-## Contents
+### Prerequisites
 
-- `qdrant_integration.ipynb`: Jupyter notebook with step-by-step examples
-- `README.md`: This documentation file
+- Python 3.11+
+- A running Qdrant instance (local via Docker or Qdrant Cloud)
+- OpenAI and HoneyHive API keys
 
-## Prerequisites
+### Start Qdrant locally
 
-- Python 3.8+
-- Docker (for self-hosted Qdrant)
-- HoneyHive account and API key
-- OpenAI API key (for embeddings and LLM in the example)
+```bash
+docker pull qdrant/qdrant
+docker run -p 6333:6333 -p 6334:6334 -v "$(pwd)/qdrant_storage:/qdrant/storage" qdrant/qdrant
+```
 
-## Quick Start
+### Install dependencies
 
-1. Install the required packages:
-   ```bash
-   pip install qdrant-client openai honeyhive
-   ```
+```bash
+git clone https://github.com/honeyhiveai/cookbook.git
+cd cookbook/qdrant-cookbook
+uv venv
+source .venv/bin/activate
+uv pip install -r requirements.txt
+```
 
-2. Run Qdrant locally using Docker:
-   ```bash
-   docker pull qdrant/qdrant
-   docker run -p 6333:6333 -p 6334:6334 -v "$(pwd)/qdrant_storage:/qdrant/storage" qdrant/qdrant
-   ```
+### Configuration
 
-3. Open and run the Jupyter notebook:
-   ```bash
-   jupyter notebook qdrant_integration.ipynb
-   ```
+Create a `.env` file:
 
-## Key Features
+```bash
+HH_API_KEY=your-honeyhive-api-key
+HH_PROJECT=qdrant-rag-example
+OPENAI_API_KEY=your-openai-api-key
+```
 
-- **Self-hosted & Cloud Options**: Instructions for both local Qdrant and Qdrant Cloud
-- **Complete RAG Pipeline**: From document embedding to retrieval and answer generation
-- **HoneyHive Tracing**: Automatic instrumentation of Qdrant operations
-- **Performance Monitoring**: Track latency and effectiveness of vector operations
+### Run
 
-## Additional Resources
+```bash
+uv run python qdrant_integration.py
+```
 
-- [Qdrant Documentation](https://qdrant.tech/documentation/)
+## How it works
+
+The `OpenAIInstrumentor` automatically traces all OpenAI embedding and chat completion calls. Business logic functions use `@trace` decorators for custom spans:
+
+```python
+from honeyhive import HoneyHiveTracer, trace
+from openinference.instrumentation.openai import OpenAIInstrumentor
+
+tracer = HoneyHiveTracer.init(
+    api_key=os.getenv("HH_API_KEY"),
+    project=os.getenv("HH_PROJECT"),
+)
+OpenAIInstrumentor().instrument(tracer_provider=tracer.provider)
+```
+
+## References
+
 - [HoneyHive Documentation](https://docs.honeyhive.ai/)
-- [Qdrant Python Client](https://python-client.qdrant.tech/)
-
-## Support
-
-For questions about this cookbook, please contact the HoneyHive team or visit [honeyhive.ai](https://honeyhive.ai). 
+- [Qdrant Documentation](https://qdrant.tech/documentation/)
+- [OpenAI API Documentation](https://platform.openai.com/docs/api-reference)
