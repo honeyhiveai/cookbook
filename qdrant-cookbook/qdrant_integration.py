@@ -1,20 +1,10 @@
 """
-# Qdrant Integration with HoneyHive
+Qdrant RAG Integration with HoneyHive
 
-This script demonstrates how to integrate Qdrant (a vector database) with HoneyHive for
-observability in Retrieval-Augmented Generation (RAG) pipelines.
-
-## Overview
-
-Qdrant is an open-source vector database optimized for storing and searching high-dimensional
-embeddings. In a RAG pipeline, Qdrant serves as the "long-term memory" for your LLM,
-efficiently managing storage and retrieval of document vectors.
-
-This script covers:
-1. Setting up Qdrant (both self-hosted and cloud options)
-2. Initializing HoneyHive for observability
-3. Building a complete RAG pipeline with Qdrant as the vector store
-4. Tracing and monitoring vector operations
+Demonstrates a Retrieval-Augmented Generation (RAG) pipeline using:
+- Qdrant as the vector store
+- OpenAI for embeddings and chat completions
+- HoneyHive for observability and tracing
 """
 
 import os
@@ -37,193 +27,98 @@ tracer = HoneyHiveTracer.init(
 )
 OpenAIInstrumentor().instrument(tracer_provider=tracer.provider)
 
-# Initialize OpenAI client
+# Initialize clients
 openai_client = OpenAI()
+qdrant_client = QdrantClient(url=os.getenv("QDRANT_URL", "http://localhost:6333"))
 
-# 2. Connect to Qdrant
-# Option 1: Self-Hosted Qdrant (Local)
-# docker pull qdrant/qdrant
-# docker run -p 6333:6333 -p 6334:6334 -v "$(pwd)/qdrant_storage:/qdrant/storage" qdrant/qdrant
+COLLECTION_NAME = "documents"
+EMBEDDING_MODEL = "text-embedding-3-small"
+EMBEDDING_DIM = 1536
 
-client = QdrantClient(url="http://localhost:6333")
-print("Connected to local Qdrant instance")
-
-# Option 2: Qdrant Cloud (uncomment to use)
-# QDRANT_HOST = "your-cluster-id.eu-central.aws.cloud.qdrant.io"
-# QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
-# client = QdrantClient(host=QDRANT_HOST, api_key=QDRANT_API_KEY)
-
-# 3. Create a Collection
-collection_name = "documents"
-
-if not client.collection_exists(collection_name):
-    client.create_collection(
-        collection_name=collection_name,
-        vectors_config=VectorParams(size=1536, distance=Distance.COSINE)
-    )
-    print(f"Collection '{collection_name}' created")
-else:
-    print(f"Collection '{collection_name}' already exists")
-
-# 4. Define Embedding Function
-@trace
-def embed_text(text: str) -> list:
-    """Generate embeddings for a text using OpenAI's API."""
-    response = openai_client.embeddings.create(
-        model="text-embedding-3-small",
-        input=text,
-    )
-    return response.data[0].embedding
-
-# 5. Insert Documents into Qdrant
-documents = [
+# Sample documents
+DOCUMENTS = [
     "Qdrant is a vector database optimized for storing and searching high-dimensional vectors.",
     "HoneyHive provides observability for AI applications, including RAG pipelines.",
     "Retrieval-Augmented Generation (RAG) combines retrieval systems with generative models.",
     "Vector databases like Qdrant are essential for efficient similarity search in RAG systems.",
-    "OpenAI's embedding models convert text into high-dimensional vectors for semantic search."
+    "OpenAI's embedding models convert text into high-dimensional vectors for semantic search.",
 ]
 
-@trace
-def insert_documents(docs):
-    """Insert documents into Qdrant collection."""
-    points = []
-    for idx, doc in enumerate(docs):
-        vector = embed_text(doc)
-        points.append(PointStruct(
-            id=str(idx),
-            vector=vector,
-            payload={"text": doc}
-        ))
 
-    client.upsert(
-        collection_name=collection_name,
-        points=points
+@trace
+def embed_text(text: str) -> list:
+    """Generate embeddings using OpenAI."""
+    response = openai_client.embeddings.create(model=EMBEDDING_MODEL, input=text)
+    return response.data[0].embedding
+
+
+@trace
+def setup_collection():
+    """Create collection and insert documents."""
+    if qdrant_client.collection_exists(COLLECTION_NAME):
+        qdrant_client.delete_collection(COLLECTION_NAME)
+
+    qdrant_client.create_collection(
+        collection_name=COLLECTION_NAME,
+        vectors_config=VectorParams(size=EMBEDDING_DIM, distance=Distance.COSINE),
     )
+
+    points = [
+        PointStruct(id=idx, vector=embed_text(doc), payload={"text": doc})
+        for idx, doc in enumerate(DOCUMENTS)
+    ]
+    qdrant_client.upsert(collection_name=COLLECTION_NAME, points=points)
     return len(points)
 
-num_inserted = insert_documents(documents)
-print(f"Inserted {num_inserted} documents into Qdrant")
 
-# 6. Define Retrieval Function
 @trace
-def get_relevant_docs(query: str, top_k: int = 3) -> list:
+def retrieve(query: str, top_k: int = 3) -> list:
     """Retrieve relevant documents for a query."""
     q_vector = embed_text(query)
-
-    search_results = client.search(
-        collection_name=collection_name,
-        query_vector=q_vector,
+    results = qdrant_client.query_points(
+        collection_name=COLLECTION_NAME,
+        query=q_vector,
         limit=top_k,
         with_payload=True,
     )
+    return [
+        {"text": pt.payload["text"], "score": pt.score}
+        for pt in results.points
+    ]
 
-    docs = []
-    for point in search_results:
-        docs.append({
-            "text": point.payload.get("text"),
-            "score": point.score,
-        })
 
-    return docs
-
-# 7. Define Answer Generation Function
 @trace
-def answer_query(query: str) -> str:
-    """Generate an answer for a query using retrieved documents."""
-    relevant_docs = get_relevant_docs(query)
+def rag_query(query: str) -> dict:
+    """End-to-end RAG: retrieve context, then generate an answer."""
+    docs = retrieve(query)
 
-    context = "\n\n".join([f"Document {i+1} (Score: {doc['score']:.4f}):\n{doc['text']}"
-                          for i, doc in enumerate(relevant_docs)])
-
-    prompt = f"""Answer the question based on the following context:
-
-Context:
-{context}
-
-Question: {query}
-
-Answer:"""
+    context = "\n".join(
+        f"- {doc['text']} (score: {doc['score']:.4f})" for doc in docs
+    )
 
     completion = openai_client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
-            {"role": "system", "content": "You are a helpful assistant that answers questions based on the provided context."},
-            {"role": "user", "content": prompt}
+            {"role": "system", "content": "Answer based on the provided context."},
+            {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {query}"},
         ],
         temperature=0.3,
     )
 
-    return completion.choices[0].message.content
-
-# 8. Complete RAG Pipeline
-@trace
-def rag_pipeline(query: str) -> dict:
-    """End-to-end RAG pipeline."""
-    relevant_docs = get_relevant_docs(query)
-    answer = answer_query(query)
-
     return {
         "query": query,
-        "answer": answer,
-        "retrieved_documents": relevant_docs
+        "answer": completion.choices[0].message.content,
+        "retrieved_documents": docs,
     }
 
-# 9. Test the RAG Pipeline
-def test_rag_pipeline():
-    query1 = "What is Qdrant used for?"
-    result1 = rag_pipeline(query1)
-
-    print(f"Query: {result1['query']}")
-    print(f"Answer: {result1['answer']}")
-    print("\nRetrieved Documents:")
-    for i, doc in enumerate(result1['retrieved_documents']):
-        print(f"Document {i+1} (Score: {doc['score']:.4f}): {doc['text']}")
-
-    query2 = "How does HoneyHive help with RAG pipelines?"
-    result2 = rag_pipeline(query2)
-
-    print(f"\nQuery: {result2['query']}")
-    print(f"Answer: {result2['answer']}")
-    print("\nRetrieved Documents:")
-    for i, doc in enumerate(result2['retrieved_documents']):
-        print(f"Document {i+1} (Score: {doc['score']:.4f}): {doc['text']}")
-
-# 10. Advanced: Batch Processing
-@trace
-def batch_insert_documents(documents, batch_size=10):
-    """Insert documents in batches."""
-    total_inserted = 0
-
-    for i in range(0, len(documents), batch_size):
-        batch = documents[i:i+batch_size]
-        points = []
-
-        for idx, doc in enumerate(batch):
-            vector = embed_text(doc)
-            points.append(PointStruct(
-                id=str(i + idx),
-                vector=vector,
-                payload={"text": doc}
-            ))
-
-        client.upsert(
-            collection_name=collection_name,
-            points=points
-        )
-
-        total_inserted += len(points)
-        print(f"Inserted batch {i//batch_size + 1}, total: {total_inserted} documents")
-
-    return total_inserted
-
-# 11. Cleanup (Optional)
-def cleanup():
-    """Delete the collection."""
-    client.delete_collection(collection_name=collection_name)
-    print(f"Collection '{collection_name}' deleted")
 
 if __name__ == "__main__":
-    test_rag_pipeline()
-    # cleanup()
-    print("\nDone! Check the HoneyHive UI to see the traces.")
+    num = setup_collection()
+    print(f"Inserted {num} documents into Qdrant\n")
+
+    for q in ["What is Qdrant used for?", "How does HoneyHive help with RAG pipelines?"]:
+        result = rag_query(q)
+        print(f"Q: {result['query']}")
+        print(f"A: {result['answer']}\n")
+
+    print("Done! Check the HoneyHive UI to see the traces.")

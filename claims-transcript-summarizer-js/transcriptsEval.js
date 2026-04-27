@@ -18,23 +18,22 @@ const deployment = process.env.AZURE_OPENAI_DEPLOYMENT || "gpt-4o-mini";
  * Summarize a transcript for evaluation
  */
 export async function summarizeTranscript(input) {
-  try {
-    const client = new AzureOpenAI({
-      endpoint,
-      apiKey,
-      apiVersion,
-      deployment,
-    });
+  const client = new AzureOpenAI({
+    endpoint,
+    apiKey,
+    apiVersion,
+    deployment,
+  });
 
-    const openaiFormatTemplate = [
+  const result = await client.chat.completions.create({
+    messages: [
       {
         role: "system",
         content: "You are an AI assistant that helps insurance agents summarize call transcripts.",
       },
       {
         role: "user",
-        content: `
-You are an expert insurance claims analyst. Please summarize the following claims call transcript into key points:
+        content: `You are an expert insurance claims analyst. Please summarize the following claims call transcript into key points:
 
 1. Customer information
 2. Claim details
@@ -46,37 +45,15 @@ ${input.transcript}
 
 Please provide a concise summary with the most important information.`,
       },
-    ];
+    ],
+    temperature: 0.3,
+    max_tokens: 500,
+    model: "",
+  });
 
-    const hyperparams = {
-      temperature: 0.3,
-      max_tokens: 500,
-      top_p: 0.95,
-      frequency_penalty: 0,
-      presence_penalty: 0,
-    };
-
-    const result = await client.chat.completions.create({
-      messages: openaiFormatTemplate,
-      ...hyperparams,
-      model: "",
-    });
-
-    return {
-      summary: result.choices[0].message.content,
-      metadata: {
-        tokenCount: {
-          promptTokens: result.usage?.prompt_tokens || 0,
-          completionTokens: result.usage?.completion_tokens || 0,
-          totalTokens: result.usage?.total_tokens || 0,
-        },
-        model: deployment,
-      },
-    };
-  } catch (error) {
-    console.error("Error summarizing transcript:", error);
-    throw error;
-  }
+  return {
+    summary: result.choices[0].message.content,
+  };
 }
 
 /**

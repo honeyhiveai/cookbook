@@ -90,26 +90,25 @@ CUSTOMER: You too. Goodbye.
 `;
 
 /**
- * Core function to summarize transcripts using Azure OpenAI
+ * Summarize a transcript using Azure OpenAI
  */
-async function _summarizeTranscriptCore(transcript, enrichSpanCallback = null) {
-  try {
-    const client = new AzureOpenAI({
-      endpoint,
-      apiKey,
-      apiVersion,
-      deployment,
-    });
+async function summarizeTranscript(transcript) {
+  const client = new AzureOpenAI({
+    endpoint,
+    apiKey,
+    apiVersion,
+    deployment,
+  });
 
-    const openaiFormatTemplate = [
+  const result = await client.chat.completions.create({
+    messages: [
       {
         role: "system",
         content: "You are an AI assistant that helps insurance agents summarize call transcripts.",
       },
       {
         role: "user",
-        content: `
-You are an expert insurance claims analyst. Please summarize the following claims call transcript into key points:
+        content: `You are an expert insurance claims analyst. Please summarize the following claims call transcript into key points:
 
 1. Customer information
 2. Claim details
@@ -117,81 +116,17 @@ You are an expert insurance claims analyst. Please summarize the following claim
 4. Next steps or actions
 
 Transcript:
-{{transcript}}
+${transcript}
 
 Please provide a concise summary with the most important information.`,
       },
-    ];
+    ],
+    temperature: 0.3,
+    max_tokens: 500,
+    model: "",
+  });
 
-    const filledMessages = JSON.parse(JSON.stringify(openaiFormatTemplate));
-    filledMessages[1].content = filledMessages[1].content.replace("{{transcript}}", transcript);
-
-    const hyperparams = {
-      temperature: 0.3,
-      max_tokens: 500,
-      top_p: 0.95,
-      frequency_penalty: 0,
-      presence_penalty: 0,
-    };
-
-    const result = await client.chat.completions.create({
-      messages: filledMessages,
-      ...hyperparams,
-      model: "",
-    });
-
-    const configData = {
-      model: deployment,
-      template: openaiFormatTemplate,
-      hyperparameters: hyperparams,
-    };
-
-    const metadataData = {
-      tokenCount: {
-        promptTokens: result.usage?.prompt_tokens || 0,
-        completionTokens: result.usage?.completion_tokens || 0,
-        totalTokens: result.usage?.total_tokens || 0,
-      },
-    };
-
-    if (enrichSpanCallback && typeof enrichSpanCallback === "function") {
-      enrichSpanCallback(configData, metadataData);
-    }
-
-    return {
-      summary: result.choices[0].message.content,
-      configData,
-      metadataData,
-    };
-  } catch (error) {
-    console.error("Error summarizing transcript:", error);
-    throw error;
-  }
-}
-
-/**
- * Summarize a single transcript
- */
-async function summarizeTranscript(transcript) {
-  const result = await _summarizeTranscriptCore(transcript);
-  return result.summary;
-}
-
-/**
- * Process multiple transcripts
- */
-async function processTranscripts(transcripts) {
-  const results = [];
-
-  for (const transcript of transcripts) {
-    const result = await _summarizeTranscriptCore(transcript);
-    results.push({
-      transcript_id: transcript.id || "unknown",
-      summary: result.summary,
-    });
-  }
-
-  return results;
+  return result.choices[0].message.content;
 }
 
 /**
@@ -206,16 +141,9 @@ async function main() {
       sessionName: "Claims Transcript Summary",
     });
 
-    const tracedSummarizeTranscript = tracer.traceFunction({ eventType: "model" })(
-      async function summarizeTranscript(transcript) {
-        const result = await _summarizeTranscriptCore(transcript, (configData, metadataData) => {
-          tracer.enrichSpan({
-            config: configData,
-            metadata: metadataData,
-          });
-        });
-
-        return result.summary;
+    const tracedSummarize = tracer.traceFunction({ eventType: "model" })(
+      async function summarize(transcript) {
+        return await summarizeTranscript(transcript);
       }
     );
 
@@ -223,17 +151,17 @@ async function main() {
       console.log("Processing example transcript...");
       console.log("=================================");
 
-      const summary = await tracedSummarizeTranscript(exampleTranscript);
+      const summary = await tracedSummarize(exampleTranscript);
 
-      console.log("\n=== EXAMPLE TRANSCRIPT SUMMARY ===\n");
+      console.log("\n=== TRANSCRIPT SUMMARY ===\n");
       console.log(summary);
       console.log("\n=================================\n");
     });
   } catch (error) {
-    console.error("The sample encountered an error:", error);
+    console.error("Error:", error);
   }
 }
 
 main();
 
-export { summarizeTranscript, processTranscripts, main };
+export { summarizeTranscript, main };
