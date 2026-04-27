@@ -32,7 +32,6 @@ Integration examples for AI observability and evaluation with HoneyHive.
 | Cookbook | Description |
 |----------|-------------|
 | [claims-summarizer-python](./claims-summarizer-python) | Insurance claims summarization with AWS Bedrock and HoneyHive (Python) |
-| [claims-transcript-summarizer-js](./claims-transcript-summarizer-js) | Insurance call transcript summarization with Azure OpenAI and HoneyHive (JavaScript) |
 
 ### Legacy
 
