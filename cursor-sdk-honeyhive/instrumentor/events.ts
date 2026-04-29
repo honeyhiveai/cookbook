@@ -9,7 +9,11 @@ import {
   getToolResultStatus,
 } from './cursorSteps.js';
 import {
+  type CursorConversationSummary,
+  type CursorDeltaSummary,
   type CursorRunGit,
+  type CursorStreamSummary,
+  type CursorTokenUsage,
   type HoneyHiveSanitizer,
   type HoneyHiveTraceEvent,
   type ToolConversationStep,
@@ -81,6 +85,11 @@ export function createAgentEvent(options: {
   durationMs?: number;
   git?: CursorRunGit;
   stepCounts: Record<string, number>;
+  deltaSummary: CursorDeltaSummary;
+  streamSummary: CursorStreamSummary;
+  streamError?: string;
+  conversationSummary?: CursorConversationSummary;
+  conversationError?: string;
   thinkingText: string;
   sanitize: HoneyHiveSanitizer;
 }): HoneyHiveTraceEvent {
@@ -101,6 +110,11 @@ export function createAgentEvent(options: {
       'gen_ai.operation.name': 'invoke_agent',
       'gen_ai.agent.name': 'Cursor SDK Agent',
     }),
+    metrics: compactObject({
+      token_delta_total: options.deltaSummary.tokenDeltaTotal,
+      step_duration_ms_total: sum(options.deltaSummary.stepDurationsMs),
+      thinking_duration_ms_total: sum(options.deltaSummary.thinkingDurationsMs),
+    }),
     inputs: compactObject({
       prompt: options.prompt,
       workspace: options.sanitize(options.cwd, 'workspace'),
@@ -118,6 +132,19 @@ export function createAgentEvent(options: {
       'cursor.runtime': 'local',
       'cursor.git': options.sanitize(options.git, 'metadata'),
       'cursor.step_counts': options.stepCounts,
+      'cursor.delta_counts': options.deltaSummary.counts,
+      'cursor.stream': options.streamSummary,
+      'cursor.stream_error': options.streamError,
+      'cursor.step_durations_ms': options.deltaSummary.stepDurationsMs.length
+        ? options.deltaSummary.stepDurationsMs
+        : undefined,
+      'cursor.thinking_durations_ms': options.deltaSummary.thinkingDurationsMs.length
+        ? options.deltaSummary.thinkingDurationsMs
+        : undefined,
+      'cursor.shell_output_chunks': options.deltaSummary.shellOutputChunks || undefined,
+      'cursor.summary_updates': options.deltaSummary.summaryUpdates || undefined,
+      'cursor.conversation': options.conversationSummary,
+      'cursor.conversation_error': options.conversationError,
     }),
   };
 }
@@ -133,9 +160,14 @@ export function createFinalEvent(options: {
   result?: string;
   status: RunResultStatus;
   error?: string;
+  startTime: number;
   endTime: number;
+  usage?: CursorTokenUsage;
   sanitize: HoneyHiveSanitizer;
 }): HoneyHiveTraceEvent {
+  const usageFields = tokenUsageFields(options.usage);
+  const startTime = options.startTime;
+
   return {
     event_id: options.eventId,
     session_id: options.sessionId,
@@ -143,24 +175,28 @@ export function createFinalEvent(options: {
     event_type: 'model',
     event_name: 'turn.agent',
     source: options.source,
-    start_time: options.endTime,
+    start_time: startTime,
     end_time: options.endTime,
-    duration: 0,
+    duration: options.endTime - startTime,
     config: compactObject({
       model: options.model,
+      provider: 'cursor',
       'gen_ai.system': 'cursor',
       'gen_ai.operation.name': 'chat',
     }),
-    inputs: {
-      prompt: options.sanitize(options.prompt, 'prompt'),
-    },
+    inputs: compactObject({
+      chat_history: [{ role: 'user', content: options.sanitize(options.prompt, 'prompt') }],
+    }),
     outputs: compactObject({
+      role: 'assistant',
+      content: options.sanitize(options.result, 'result'),
       status: options.status,
-      response: options.sanitize(options.result, 'result'),
     }),
     error: eventError(options.status, options.error),
     metadata: compactObject({
       project: options.project,
+      provider: 'cursor',
+      ...usageFields,
     }),
   };
 }
@@ -173,4 +209,25 @@ function eventError(cursorStatus: RunResultStatus, error?: string): string | und
     return undefined;
   }
   return `Cursor run ${cursorStatus}`;
+}
+
+function tokenUsageFields(usage?: CursorTokenUsage): Record<string, number> {
+  if (!usage) {
+    return {};
+  }
+
+  return {
+    prompt_tokens: usage.inputTokens,
+    completion_tokens: usage.outputTokens,
+    total_tokens: usage.inputTokens + usage.outputTokens,
+    cache_read_input_tokens: usage.cacheReadTokens,
+    cache_write_input_tokens: usage.cacheWriteTokens,
+  };
+}
+
+function sum(values: number[]): number | undefined {
+  if (!values.length) {
+    return undefined;
+  }
+  return values.reduce((total, value) => total + value, 0);
 }

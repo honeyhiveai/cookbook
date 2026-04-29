@@ -3,6 +3,7 @@ import path from 'node:path';
 import { type HoneyHiveSanitizer, type SanitizeContext } from './types.js';
 
 const SENSITIVE_KEY_PATTERN = /api[_-]?key|authorization|cookie|credential|password|secret|token/i;
+const PATH_KEY_PATTERN = /(^|[_-])(cwd|dir|directory|file|path)$|(?:Cwd|Dir|Directory|File|Path)$/;
 const REDACTED = '[redacted]';
 
 export function compact(value: unknown, maxLength = 8000): string {
@@ -51,8 +52,11 @@ export function isString(value: unknown): value is string {
   return typeof value === 'string';
 }
 
-function sanitizeValue(value: unknown, depth = 0): unknown {
+function sanitizeValue(value: unknown, depth = 0, key?: string): unknown {
   if (typeof value === 'string') {
+    if (key && PATH_KEY_PATTERN.test(key) && path.isAbsolute(value)) {
+      return path.basename(value);
+    }
     return truncateString(value);
   }
   if (typeof value !== 'object' || value === null) {
@@ -68,7 +72,7 @@ function sanitizeValue(value: unknown, depth = 0): unknown {
   return Object.fromEntries(
     Object.entries(value).slice(0, 100).map(([key, entryValue]) => [
       key,
-      SENSITIVE_KEY_PATTERN.test(key) ? REDACTED : sanitizeValue(entryValue, depth + 1),
+      SENSITIVE_KEY_PATTERN.test(key) ? REDACTED : sanitizeValue(entryValue, depth + 1, key),
     ]),
   );
 }
