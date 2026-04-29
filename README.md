@@ -12,6 +12,12 @@ Integration examples for AI observability and evaluation with HoneyHive.
 |----------|-------------|
 | [wealth-management-agent](./wealth-management-agent) | Multi-agent wealth advisory platform with HoneyHive tracing (CrewAI) |
 
+### Agent SDK Integrations
+
+| Cookbook | Description |
+|----------|-------------|
+| [cursor-sdk-honeyhive](./cursor-sdk-honeyhive) | HoneyHive tracing for Cursor SDK agent runs and tool calls |
+
 ### RAG & Vector Databases
 
 | Cookbook | Description |
