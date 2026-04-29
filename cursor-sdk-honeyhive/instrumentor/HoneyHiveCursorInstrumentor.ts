@@ -327,6 +327,9 @@ function recordDelta(summary: CursorDeltaSummary, update: InteractionUpdate): vo
     case 'text-delta':
       summary.responseStartTime ??= Date.now();
       break;
+    case 'tool-call-started':
+      summary.responseStartTime = undefined;
+      break;
     case 'turn-ended':
       summary.usage = mergeUsage(summary.usage, update.usage);
       break;
@@ -348,7 +351,6 @@ function recordDelta(summary: CursorDeltaSummary, update: InteractionUpdate): vo
       summary.summaryUpdates += 1;
       break;
     case 'thinking-delta':
-    case 'tool-call-started':
     case 'partial-tool-call':
     case 'tool-call-completed':
     case 'step-started':
