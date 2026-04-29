@@ -206,7 +206,6 @@ export class HoneyHiveCursorInstrumentor {
       startTime,
       endTime,
       childrenIds: [agentEventId],
-      usage: deltaSummary.usage,
       conversationSummary,
     });
     await this.#client.sessions.addTraces({
@@ -236,7 +235,6 @@ export class HoneyHiveCursorInstrumentor {
     startTime: number;
     endTime: number;
     childrenIds: string[];
-    usage?: CursorDeltaSummary['usage'];
     conversationSummary?: CursorConversationSummary;
   }): Promise<StartSessionResponse> {
     return this.#client.sessions.start({

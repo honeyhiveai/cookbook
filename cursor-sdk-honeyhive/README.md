@@ -2,6 +2,8 @@
 
 Trace [Cursor SDK](https://cursor.com/docs/sdk/typescript) agent runs in [HoneyHive](https://honeyhive.ai). This cookbook hooks Cursor's documented streaming, `onDelta`, `onStep`, `wait()`, and `conversation()` surfaces and exports each run as a HoneyHive trace using `@honeyhive/api-client`.
 
+> **Note:** Cursor's TypeScript SDK is currently in public beta. Treat this cookbook as an experimental example and expect SDK APIs to evolve.
+
 One Cursor run becomes a HoneyHive session containing:
 
 - a top-level `session.start` event
@@ -68,7 +70,7 @@ Each Cursor run produces one HoneyHive session with the following events:
 | Event           | Type    | Notes                                                                                                                                                                                           |
 | --------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `session.start` | session | Top-level container with prompt, workspace, status, and the SDK tag (`sdk: cursor`).                                                                                                            |
-| `agent.run`     | chain   | Cursor SDK invocation. Inputs: prompt + workspace. Outputs: status, result, accumulated thinking. Metadata includes IDs, Git data, stream/delta summaries, token usage, step counts, and conversation shape. |
+| `agent.run`     | chain   | Cursor SDK invocation. Inputs: prompt + workspace. Outputs: status, result, accumulated thinking. Metadata includes IDs, Git data, stream/delta summaries, step counts, and conversation shape. |
 | `tool.<name>`   | tool    | One per Cursor [tool call](https://cursor.com/docs/sdk/typescript) (`shell`, `edit`, `read`, `write`, `grep`, `mcp`, etc.). Captures args, result, status, and execution time.                  |
 | `turn.agent`    | model   | Final model turn — prompt + response text, tagged with `gen_ai.system: cursor`.                                                                                                                 |
 
