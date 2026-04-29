@@ -29,6 +29,7 @@ export interface TraceCursorRunOptions {
   sessionName?: string;
   model?: string;
   cwd?: string;
+  onStep?: (step: ConversationStep) => void | Promise<void>;
 }
 
 export interface TraceCursorRunResult {

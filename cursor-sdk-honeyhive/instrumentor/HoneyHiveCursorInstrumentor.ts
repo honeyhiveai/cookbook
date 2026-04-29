@@ -47,7 +47,7 @@ export class HoneyHiveCursorInstrumentor {
 
     try {
       const run = await options.agent.send(options.message, {
-        onStep: ({ step }) => {
+        onStep: async ({ step }) => {
           stepCounts[step.type] = (stepCounts[step.type] ?? 0) + 1;
 
           switch (step.type) {
@@ -76,6 +76,8 @@ export class HoneyHiveCursorInstrumentor {
               throw new Error(`Unhandled Cursor conversation step: ${JSON.stringify(exhaustive)}`);
             }
           }
+
+          await options.onStep?.(step);
         },
       });
       cursorRunId = run.id;

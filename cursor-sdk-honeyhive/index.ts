@@ -21,6 +21,8 @@ const agent = await Agent.create({
   local: { cwd: workspaceDir },
 });
 
+console.log(`→ Starting Cursor agent (${model}) in ${workspaceDir}`);
+
 try {
   const result = await instrumentor.traceRun({
     agent,
@@ -30,9 +32,19 @@ try {
     sessionName: 'Cursor SDK HoneyHive Demo',
     model,
     cwd: workspaceDir,
+    onStep: (step) => {
+      switch (step.type) {
+        case 'toolCall':
+          console.log(`  • tool: ${step.message.type}`);
+          break;
+        case 'thinkingMessage':
+        case 'assistantMessage':
+          break;
+      }
+    },
   });
 
-  console.log('Exported Cursor SDK trace to HoneyHive:');
+  console.log('← Exported Cursor SDK trace to HoneyHive:');
   console.log(JSON.stringify(result, null, 2));
 } finally {
   await agent[Symbol.asyncDispose]();
