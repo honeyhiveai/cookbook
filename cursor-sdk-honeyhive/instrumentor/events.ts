@@ -110,11 +110,6 @@ export function createAgentEvent(options: {
       'gen_ai.operation.name': 'invoke_agent',
       'gen_ai.agent.name': 'Cursor SDK Agent',
     }),
-    metrics: compactObject({
-      token_delta_total: options.deltaSummary.tokenDeltaTotal,
-      step_duration_ms_total: sum(options.deltaSummary.stepDurationsMs),
-      thinking_duration_ms_total: sum(options.deltaSummary.thinkingDurationsMs),
-    }),
     inputs: compactObject({
       prompt: options.prompt,
       workspace: options.sanitize(options.cwd, 'workspace'),
@@ -135,6 +130,9 @@ export function createAgentEvent(options: {
       'cursor.delta_counts': options.deltaSummary.counts,
       'cursor.stream': options.streamSummary,
       'cursor.stream_error': options.streamError,
+      'cursor.token_delta_total': options.deltaSummary.tokenDeltaTotal,
+      'cursor.step_duration_ms_total': sum(options.deltaSummary.stepDurationsMs),
+      'cursor.thinking_duration_ms_total': sum(options.deltaSummary.thinkingDurationsMs),
       'cursor.step_durations_ms': options.deltaSummary.stepDurationsMs.length
         ? options.deltaSummary.stepDurationsMs
         : undefined,
