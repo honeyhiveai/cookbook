@@ -1,0 +1,28 @@
+{
+  "name": "cursor-sdk-honeyhive",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Trace a Cursor SDK agent run with HoneyHive",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "start": "tsx index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@cursor/sdk": "^1.0.9",
+    "@honeyhive/api-client": "2.0.0-rc3",
+    "dotenv": "^17.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.8",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "sqlite3"
+    ]
+  }
+}
