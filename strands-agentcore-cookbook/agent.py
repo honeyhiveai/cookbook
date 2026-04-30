@@ -62,6 +62,11 @@ tracer = HoneyHiveTracer.init(
     source="cookbook",
     session_name="strands-agentcore-demo",
 )
+# Public docs (https://docs.honeyhive.ai/v2/integrations/strands) recommend
+# initializing HoneyHive BEFORE importing strands so auto-instrumentation hooks
+# can attach. Inside AgentCore the runtime imports the user module before any
+# user-controlled init, so we attach the OpenInference processor explicitly.
+#
 # Strands emits OTEL gen_ai.* spans; this processor maps them into the
 # OpenInference agent/llm/tool span kinds HoneyHive renders natively.
 tracer.provider.add_span_processor(StrandsAgentsToOpenInferenceProcessor())
