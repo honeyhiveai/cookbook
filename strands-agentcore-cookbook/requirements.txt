@@ -1,4 +1,4 @@
-# Pinned: rc21+ has the session-baggage fix needed for Lambda/AgentCore container reuse correctness
+# Pinned: rc21+ includes the session-baggage fix AND bundles Strands auto-instrumentation — no separate openinference-instrumentation-strands-agents needed
 honeyhive>=1.0.0rc21
 # AgentCore runtime SDK — pin to >=1.7.0 for the BedrockAgentCoreApp lifecycle hooks used in agent.py
 bedrock-agentcore>=1.7.0
@@ -6,7 +6,5 @@ bedrock-agentcore>=1.7.0
 bedrock-agentcore-starter-toolkit>=0.3.6
 # Strands core — pin to a version on/after the hive-kube#3239 ingestion event_type fix so spans classify correctly in HoneyHive
 strands-agents>=1.38.0
-# OpenInference span processor that maps Strands gen_ai.* spans to the agent/llm/tool kinds HoneyHive renders natively
-openinference-instrumentation-strands-agents>=0.1.2
 # Reads .env files for local dev; not strictly required in the AgentCore runtime where env is provided by the platform
 python-dotenv

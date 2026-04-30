@@ -9,9 +9,10 @@ This cookbook shows the smallest viable end-to-end shape:
                                                                     +-- @tool calculator
                                                                     +-- @tool current_time
 
-HoneyHive is wired in at module load. Strands emits native OpenTelemetry spans;
-the OpenInference span processor translates them into the agent / llm / tool
-typing HoneyHive's UI expects, then HoneyHive's exporter ships them.
+HoneyHive is wired in at module load. Per the public docs, HoneyHive must be
+initialized BEFORE importing strands so its auto-instrumentation hooks register
+against Strands' OpenTelemetry tracer provider — the rc21+ SDK then maps
+Strands' gen_ai.* spans into the agent / llm / tool typing HoneyHive renders.
 
 Run locally:
     agentcore configure -e agent.py
@@ -33,15 +34,25 @@ from typing import Any
 
 from bedrock_agentcore import BedrockAgentCoreApp
 from dotenv import load_dotenv
-from openinference.instrumentation.strands_agents import (
-    StrandsAgentsToOpenInferenceProcessor,
-)
-from strands import Agent, tool
-from strands.models import BedrockModel
 
+# HoneyHive must be initialized before importing strands so the auto-instrumentation
+# hooks register against Strands' OpenTelemetry tracer provider. See
+# https://docs.honeyhive.ai/v2/integrations/strands.
 from honeyhive import HoneyHiveTracer
 
 load_dotenv(override=True)
+
+tracer = HoneyHiveTracer.init(
+    api_key=os.getenv("HH_API_KEY"),
+    project=os.getenv("HH_PROJECT"),
+    source="cookbook",
+    session_name="strands-agentcore-demo",
+)
+
+# Imports below are intentionally delayed until after HoneyHiveTracer.init so
+# Strands' OTEL tracer provider picks up the HoneyHive span processors.
+from strands import Agent, tool  # noqa: E402
+from strands.models import BedrockModel  # noqa: E402
 
 # Default to Claude Sonnet 4.0 cross-region inference profile.
 # Override via env var for a different region or to use an
@@ -55,21 +66,6 @@ load_dotenv(override=True)
 DEFAULT_MODEL_ID = "us.anthropic.claude-sonnet-4-20250514-v1:0"
 MODEL_ID = os.getenv("BEDROCK_MODEL_ID", DEFAULT_MODEL_ID)
 AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
-
-tracer = HoneyHiveTracer.init(
-    api_key=os.getenv("HH_API_KEY"),
-    project=os.getenv("HH_PROJECT"),
-    source="cookbook",
-    session_name="strands-agentcore-demo",
-)
-# Public docs (https://docs.honeyhive.ai/v2/integrations/strands) recommend
-# initializing HoneyHive BEFORE importing strands so auto-instrumentation hooks
-# can attach. Inside AgentCore the runtime imports the user module before any
-# user-controlled init, so we attach the OpenInference processor explicitly.
-#
-# Strands emits OTEL gen_ai.* spans; this processor maps them into the
-# OpenInference agent/llm/tool span kinds HoneyHive renders natively.
-tracer.provider.add_span_processor(StrandsAgentsToOpenInferenceProcessor())
 
 
 @tool
