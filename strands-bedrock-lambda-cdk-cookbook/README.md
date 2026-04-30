@@ -19,6 +19,26 @@ Deploy a [Strands](https://strandsagents.com) agent that calls AWS Bedrock from 
 - **AWS Bedrock model access.** Claude and Nova models require separate access grants in the Bedrock console (*Model access* → *Manage model access*). Grant access before deploying.
 - **A HoneyHive project + API key.** Create them at [app.honeyhive.ai](https://app.honeyhive.ai) and keep the key handy for step 4. See the [HoneyHive quickstart](https://docs.honeyhive.ai/introduction/quickstart) if you need a walkthrough.
 
+## Workshop setup
+
+If you're following along during the Nationwide hackathon, the live edit segment is demoed in VS Code with GitHub Copilot. Skip this section if you're working through the cookbook on your own.
+
+**1. Install VS Code.** Download from [code.visualstudio.com](https://code.visualstudio.com/).
+
+**2. Install GitHub Copilot.** Open the Extensions panel (`cmd+shift+X` / `ctrl+shift+X`), search for *GitHub Copilot*, install it. The companion *GitHub Copilot Chat* extension installs alongside — keep it enabled.
+
+**3. Sign in.** Run *GitHub Copilot: Sign In* from the command palette (`cmd+shift+P` / `ctrl+shift+P`) and authorize through GitHub. Nationwide attendees already have org-issued Copilot seats; if the sign-in prompt says you don't have access, flag it to the workshop host.
+
+**4. Confirm settings.** Open Settings (`cmd+,` / `ctrl+,`) and verify:
+
+- `editor.inlineSuggest.enabled` is on (default).
+- `github.copilot.enable` is `*` (all languages).
+- Copilot Chat opens with `cmd+ctrl+I` on macOS, `ctrl+alt+I` on Windows/Linux — dock it next to the editor while you work.
+
+**Using Copilot during the live edit.** The customization segment touches `lambda/handler.py` — the `calculator` tool, the agent's `system_prompt`, and the `Agent(tools=[...])` wiring are the spots we'll edit. `Tab` accepts the inline suggestion, `alt+]` / `alt+[` cycles through alternates, and `cmd+ctrl+I` (or `ctrl+alt+I`) opens Chat — paste the function and ask for an explanation if a suggestion looks off. Treat suggestions as drafts; read before accepting.
+
+**Venue Wi-Fi flaky?** Copilot needs network. If it drops, the deploy steps below stand alone — every command is copy-pasteable, and the *Common errors* section covers the failures you're likely to hit.
+
 ## Setup
 
 All commands run from `strands-bedrock-lambda-cdk-cookbook/`.
