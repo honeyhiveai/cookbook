@@ -1,0 +1,54 @@
+Bundling asset StrandsBedrockLambdaStack/HandlerFunction/Code/Stage...
+docker: Cannot connect to the Docker daemon at unix:///Users/dhruvsingh/.docker/run/docker.sock. Is the docker daemon running?.
+See 'docker run --help'.
+[1;35mjsii.errors.JavaScriptError[0m: [35m
+  «FailedToBundleAsset» Failed to bundle asset StrandsBedrockLambdaStack/HandlerFunction/Code/Stage, bundle output is located at /Users/dhruvsingh/honeyhive/cookbook/strands-bedrock-lambda-cdk-cookbook/cdk.out/asset.b3076bb987d549c67b80919cad16b305a751e9c3274d976217628317cf89557d-building: CommandExecutionFailed: docker exited with status 125
+  --> Command: docker run --rm -u "501:20" -v "/Users/dhruvsingh/honeyhive/cookbook/strands-bedrock-lambda-cdk-cookbook/lambda:/asset-input:delegated" -v "/Users/dhruvsingh/honeyhive/cookbook/strands-bedrock-lambda-cdk-cookbook/cdk.out/asset.b3076bb987d549c67b80919cad16b305a751e9c3274d976217628317cf89557d-building:/asset-output:delegated" -w "/asset-input" "public.ecr.aws/sam/build-python3.12" bash -c "pip install -r requirements.txt -t /asset-output && cp -au . /asset-output"
+      ...new Function2 in aws-cdk-lib...
+      at Kernel._Kernel_create (/private/var/folders/rg/p8zz76_d14bf_zl146p4yblw0000gn/T/tmppjt6fqxe/lib/program.js:1:61100)
+  Relates to construct:
+      <.> (aws-cdk-lib.App)
+       └─ StrandsBedrockLambdaStack (aws-cdk-lib.Stack)
+           └─ HandlerFunction (aws-cdk-lib.aws_lambda.Function)
+               └─ Code (aws-cdk-lib.aws_s3_assets.Asset)
+                   └─ Stage (aws-cdk-lib.AssetStaging)[0m
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File [35m"/Users/dhruvsingh/honeyhive/cookbook/strands-bedrock-lambda-cdk-cookbook/app.py"[0m, line [35m8[0m, in [35m<module>[0m
+    [31mStrandsBedrockLambdaStack[0m[1;31m([0m
+    [31m~~~~~~~~~~~~~~~~~~~~~~~~~[0m[1;31m^[0m
+        [1;31mapp,[0m
+        [1;31m^^^^[0m
+        [1;31m"StrandsBedrockLambdaStack",[0m
+        [1;31m^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+    [1;31m)[0m
+    [1;31m^[0m
+  File [35m"/Users/dhruvsingh/honeyhive/cookbook/strands-bedrock-lambda-cdk-cookbook/.venv/lib/python3.14/site-packages/jsii/_runtime.py"[0m, line [35m118[0m, in [35m__call__[0m
+    inst = super(JSIIMeta, cast(JSIIMeta, cls)).__call__(*args, **kwargs)
+  File [35m"/Users/dhruvsingh/honeyhive/cookbook/strands-bedrock-lambda-cdk-cookbook/stacks/strands_bedrock_lambda_stack.py"[0m, line [35m57[0m, in [35m__init__[0m
+    handler_fn = lambda_.Function(
+        self,
+    ...<24 lines>...
+        log_group=log_group,
+    )
+  File [35m"/Users/dhruvsingh/honeyhive/cookbook/strands-bedrock-lambda-cdk-cookbook/.venv/lib/python3.14/site-packages/jsii/_runtime.py"[0m, line [35m118[0m, in [35m__call__[0m
+    inst = super(JSIIMeta, cast(JSIIMeta, cls)).__call__(*args, **kwargs)
+  File [35m"/Users/dhruvsingh/honeyhive/cookbook/strands-bedrock-lambda-cdk-cookbook/.venv/lib/python3.14/site-packages/aws_cdk/aws_lambda/__init__.py"[0m, line [35m33978[0m, in [35m__init__[0m
+    [31mjsii.create[0m[1;31m(self.__class__, self, [scope, id, props])[0m
+    [31m~~~~~~~~~~~[0m[1;31m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  File [35m"/Users/dhruvsingh/honeyhive/cookbook/strands-bedrock-lambda-cdk-cookbook/.venv/lib/python3.14/site-packages/jsii/_kernel/__init__.py"[0m, line [35m334[0m, in [35mcreate[0m
+    response = self.provider.create(
+        CreateRequest(
+    ...<7 lines>...
+        )
+    )
+  File [35m"/Users/dhruvsingh/honeyhive/cookbook/strands-bedrock-lambda-cdk-cookbook/.venv/lib/python3.14/site-packages/jsii/_kernel/providers/process.py"[0m, line [35m365[0m, in [35mcreate[0m
+    return [31mself._process.send[0m[1;31m(request, CreateResponse)[0m
+           [31m~~~~~~~~~~~~~~~~~~[0m[1;31m^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  File [35m"/Users/dhruvsingh/honeyhive/cookbook/strands-bedrock-lambda-cdk-cookbook/.venv/lib/python3.14/site-packages/jsii/_kernel/providers/process.py"[0m, line [35m342[0m, in [35msend[0m
+    raise RuntimeError(resp.error) from JavaScriptError(resp.stack)
+[1;35mRuntimeError[0m: [35mFailed to bundle asset StrandsBedrockLambdaStack/HandlerFunction/Code/Stage, bundle output is located at /Users/dhruvsingh/honeyhive/cookbook/strands-bedrock-lambda-cdk-cookbook/cdk.out/asset.b3076bb987d549c67b80919cad16b305a751e9c3274d976217628317cf89557d-building: CommandExecutionFailed: docker exited with status 125
+--> Command: docker run --rm -u "501:20" -v "/Users/dhruvsingh/honeyhive/cookbook/strands-bedrock-lambda-cdk-cookbook/lambda:/asset-input:delegated" -v "/Users/dhruvsingh/honeyhive/cookbook/strands-bedrock-lambda-cdk-cookbook/cdk.out/asset.b3076bb987d549c67b80919cad16b305a751e9c3274d976217628317cf89557d-building:/asset-output:delegated" -w "/asset-input" "public.ecr.aws/sam/build-python3.12" bash -c "pip install -r requirements.txt -t /asset-output && cp -au . /asset-output"[0m
+python3 app.py: Subprocess exited with error 1
