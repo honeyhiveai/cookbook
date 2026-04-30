@@ -1,0 +1,6 @@
+honeyhive>=1.0.0rc21
+bedrock-agentcore>=1.7.0
+bedrock-agentcore-starter-toolkit>=0.3.6
+strands-agents>=1.38.0
+openinference-instrumentation-strands-agents>=0.1.2
+python-dotenv

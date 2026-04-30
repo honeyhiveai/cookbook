@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+.pytest_cache/
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# AWS
+.aws/
+*.pem
+credentials
+
+# AgentCore — generated, account-specific. Use .bedrock_agentcore.yaml.example as the template.
+.bedrock_agentcore.yaml
+Dockerfile
+.dockerignore
