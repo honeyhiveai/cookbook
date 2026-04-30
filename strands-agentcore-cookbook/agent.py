@@ -72,13 +72,17 @@ AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
 def calculator(expression: str) -> str:
     """Evaluate a basic arithmetic expression like "2 + 2" or "(17 * 23) / 4".
 
-    Only +, -, *, /, parentheses, and decimal numbers are accepted. Returns
-    the numeric result as a string, or an error message if the expression is
-    invalid.
+    Only +, -, *, /, parentheses, and decimal numbers are accepted. The `**`
+    exponentiation operator is rejected explicitly — `9**9**9` passes the
+    charset filter but evaluates to a number with ~370M digits and would
+    exhaust memory. Returns the numeric result as a string, or an error
+    message if the expression is invalid.
     """
     allowed = set("0123456789.+-*/() ")
     if not expression or not set(expression) <= allowed:
         return f"error: expression contains unsupported characters: {expression!r}"
+    if "**" in expression:
+        return "error: exponentiation (**) is rejected to prevent DoS via large numbers"
     try:
         # Constrained to arithmetic-only chars above, so eval is safe here.
         result = eval(expression, {"__builtins__": {}}, {})  # noqa: S307
