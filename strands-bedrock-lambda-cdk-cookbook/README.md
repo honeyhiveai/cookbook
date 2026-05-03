@@ -218,3 +218,7 @@ aws secretsmanager delete-secret \
 - [Strands agents](https://strandsagents.com/latest/) — tool definitions, model providers, multi-agent patterns.
 - [AWS Bedrock inference profiles](https://docs.aws.amazon.com/bedrock/latest/userguide/inference-profiles.html) — when you need an inference profile vs. foundation model vs. application inference profile.
 - **AgentCore runtime variant** — an AWS AgentCore version of this cookbook is coming soon.
+
+## Version pins
+
+`lambda/requirements.txt` uses exact pins — reproducibility over flexibility. The HoneyHive SDK is pinned to `1.0.0rc21` because it's the earliest rc with both the session_id baggage isolation (prevents warm-Lambda session bleed across users) and the event_type priority detection that routes Strands GenAI ops (`invoke_agent` → chain, `execute_tool` → tool, `chat` → model) instead of falling through to the generic `tool` default. See the header of `lambda/requirements.txt` for the full rationale.
