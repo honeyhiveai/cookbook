@@ -1,4 +1,4 @@
-honeyhive>=1.0.0rc21
+honeyhive>=1.0.0
 openai
 qdrant-client
 openinference-instrumentation-openai

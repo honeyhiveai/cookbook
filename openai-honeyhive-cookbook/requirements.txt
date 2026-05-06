@@ -1,4 +1,4 @@
-honeyhive>=1.0.0rc21
+honeyhive>=1.0.0
 openai
 openinference-instrumentation-openai
 pydantic>=2.0.0

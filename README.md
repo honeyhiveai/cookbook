@@ -39,7 +39,7 @@ Older cookbooks that have not been updated to the latest SDK are in [legacy_cook
 
 ## Getting Started
 
-Each cookbook contains its own README with specific instructions. All Python cookbooks use the v2 SDK (`honeyhive>=1.0.0rc21`) with OpenInference instrumentors for automatic framework tracing.
+Each cookbook contains its own README with specific instructions. All Python cookbooks use the v2 SDK (`honeyhive>=1.0.0`) with OpenInference instrumentors for automatic framework tracing.
 
 1. Sign up at [honeyhive.ai](https://honeyhive.ai) and get your API key
 2. Clone the repo:
