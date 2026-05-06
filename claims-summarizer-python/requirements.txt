@@ -1,2 +1,4 @@
-honeyhive
+honeyhive>=1.0.0
 boto3
+openinference-instrumentation-bedrock
+python-dotenv

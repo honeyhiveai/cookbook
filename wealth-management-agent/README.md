@@ -113,14 +113,20 @@ graph TD
 ### Essential Imports
 
 ```python
-# Core HoneyHive imports
-from honeyhive.tracer import HoneyHiveTracer
-from honeyhive.tracer.custom import trace
-from honeyhive import evaluate
+from honeyhive import HoneyHiveTracer, trace, evaluate
+from openinference.instrumentation.crewai import CrewAIInstrumentor
+from openinference.instrumentation.openai import OpenAIInstrumentor
 
-# Initialize tracing (once per application) in the main workflow
-HoneyHiveTracer.init(**HONEYHIVE_CONFIG)
+# Initialize HoneyHive tracer and instrumentors
+tracer = HoneyHiveTracer.init(
+    api_key=os.getenv("HH_API_KEY"),
+    project=os.getenv("HH_PROJECT"),
+)
+CrewAIInstrumentor().instrument(tracer_provider=tracer.provider)
+OpenAIInstrumentor().instrument(tracer_provider=tracer.provider)
 ```
+
+The `CrewAIInstrumentor` auto-traces crew runs, agent activity, and task execution. The `OpenAIInstrumentor` auto-traces all underlying LLM calls. Business-logic functions use `@trace()` decorators for custom spans.
 
 ### Tracing Strategy
 
@@ -214,8 +220,7 @@ evaluate(
     project=HONEYHIVE_CONFIG['project'],
     name='Wealth Advisory Platform Eval',
     dataset=dataset,
-    evaluators=[],  # Server-side evaluation
-    server_url=HONEYHIVE_CONFIG['server_url']
+    evaluators=[],
 )
 ```
 
@@ -223,7 +228,7 @@ evaluate(
 
 ### Prerequisites
 
-- Python 3.8+
+- Python 3.11+
 - API keys: [HoneyHive](https://honeyhive.ai), [OpenAI](https://platform.openai.com), [SerpAPI](https://serpapi.com) (for market data search)
 
 ### Installation
@@ -234,32 +239,24 @@ evaluate(
    cd cookbook/wealth-management-agent
    ```
 
-2. **Create a virtual environment** (recommended):
+2. **Create a virtual environment and install dependencies**:
    ```bash
-   python -m venv venv
-   source venv/bin/activate   # On Windows: venv\Scripts\activate
-   ```
-
-3. **Install dependencies**:
-   ```bash
-   pip install -r requirements.txt
+   uv venv
+   source .venv/bin/activate
+   uv pip install -r requirements.txt
    ```
 
 ### Environment Setup
 
 Set the following environment variables before running the cookbook. You can copy `.env.example` to `.env` and fill in your keys (ensure `.env` is not committed).
 
-```bash
-# Required
-export HONEYHIVE_API_KEY="your_api_key_here"
-export OPENAI_API_KEY="your_openai_key_here"
-export SERPAPI_KEY="your_serpapi_key_here"
+Create a `.env` file:
 
-# Optional (with defaults)
-export HONEYHIVE_PROJECT="Wealth Advisory Platform"
-export HONEYHIVE_SOURCE="dev"
-export HONEYHIVE_SESSION_NAME="Client Advisory Trace"
-export HONEYHIVE_SERVER_URL="https://api.honeyhive.ai"
+```bash
+HH_API_KEY=your-honeyhive-api-key
+HH_PROJECT=Wealth Advisory Platform
+OPENAI_API_KEY=your-openai-api-key
+SERPAPI_KEY=your-serpapi-key
 ```
 
 **Security Note**: All sensitive configuration values must be provided via environment variables. Never commit API keys or secrets to version control.
@@ -268,13 +265,13 @@ export HONEYHIVE_SERVER_URL="https://api.honeyhive.ai"
 
 #### Interactive Mode (Demo)
 ```bash
-python main.py
+uv run python main.py
 ```
 Type your client inquiries at the prompt; type `exit` to end the session.
 
 #### Evaluation Mode
 ```bash
-python evaluation.py
+uv run python evaluation.py
 ```
 Runs the pre-defined evaluation scenarios and logs results to HoneyHive.
 

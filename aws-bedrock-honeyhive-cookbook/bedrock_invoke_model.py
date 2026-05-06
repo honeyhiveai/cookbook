@@ -3,22 +3,24 @@
 Use the native inference API to send a text message to Amazon Titan Text model
 with HoneyHive tracing.
 """
-import boto3
 import json
 import os
+
+import boto3
 from dotenv import load_dotenv
+
 from honeyhive import HoneyHiveTracer, trace
+from openinference.instrumentation.bedrock import BedrockInstrumentor
 
-# Load environment variables
-load_dotenv()
+load_dotenv(override=True)
 
-# Initialize HoneyHive tracer
-HoneyHiveTracer.init(
-    api_key=os.getenv("HONEYHIVE_API_KEY"),
-    project="aws-bedrock-examples",
-    source="dev",
-    session_name="invoke-bedrock-model"
+# Initialize HoneyHive tracer and Bedrock auto-instrumentation
+tracer = HoneyHiveTracer.init(
+    api_key=os.getenv("HH_API_KEY"),
+    project=os.getenv("HH_PROJECT", "aws-bedrock-examples"),
+    session_name="invoke-bedrock-model",
 )
+BedrockInstrumentor().instrument(tracer_provider=tracer.provider)
 
 @trace
 def invoke_bedrock_model(model_id, prompt, max_tokens=512, temperature=0.5, top_p=0.9):

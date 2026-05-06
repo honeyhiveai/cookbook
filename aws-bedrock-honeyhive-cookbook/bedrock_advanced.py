@@ -6,24 +6,24 @@ This example demonstrates:
 2. Adding custom metrics to traces
 3. Tracing for more complex operations
 """
-import boto3
 import json
 import os
-import time
-import uuid
+
+import boto3
 from dotenv import load_dotenv
+
 from honeyhive import HoneyHiveTracer, trace
+from openinference.instrumentation.bedrock import BedrockInstrumentor
 
-# Load environment variables
-load_dotenv()
+load_dotenv(override=True)
 
-# Initialize HoneyHive tracer
-HoneyHiveTracer.init(
-    api_key=os.getenv("HONEYHIVE_API_KEY"),
-    project="aws-bedrock-examples",
-    source="dev",
-    session_name="advanced-bedrock-tracing"
+# Initialize HoneyHive tracer and Bedrock auto-instrumentation
+tracer = HoneyHiveTracer.init(
+    api_key=os.getenv("HH_API_KEY"),
+    project=os.getenv("HH_PROJECT", "aws-bedrock-examples"),
+    session_name="advanced-bedrock-tracing",
 )
+BedrockInstrumentor().instrument(tracer_provider=tracer.provider)
 
 @trace
 def get_bedrock_model_info(bedrock_client, model_id):
@@ -61,8 +61,6 @@ def generate_article_outline(bedrock_runtime, model_id, topic):
     :param topic: Article topic
     :return: Generated outline
     """
-    start_time = time.time()
-    
     prompt = f"Create a detailed outline for an article about {topic}. " \
              f"Include an introduction, at least 3 main sections with subsections, and a conclusion."
     
@@ -84,19 +82,6 @@ def generate_article_outline(bedrock_runtime, model_id, topic):
         # Parse response
         model_response = json.loads(response["body"].read())
         outline = model_response["results"][0]["outputText"]
-        
-        # Calculate metrics
-        end_time = time.time()
-        generation_time = end_time - start_time
-        
-        # Add custom metrics to the HoneyHive trace
-        HoneyHiveTracer.current_session().add_trace_metadata({
-            "generation_time_seconds": generation_time,
-            "input_length": len(prompt),
-            "output_length": len(outline),
-            "operation": "article_outline_generation",
-            "topic": topic
-        })
         
         return outline
         
@@ -159,8 +144,6 @@ def run_rag_example(bedrock_runtime, model_id, query, context):
     :param context: Retrieved context information
     :return: Generated response
     """
-    request_id = str(uuid.uuid4())
-    
     # Create a prompt that includes the context
     prompt = f"Context information:\n{context}\n\nBased on the above context, answer the following question: {query}"
     
@@ -182,16 +165,6 @@ def run_rag_example(bedrock_runtime, model_id, query, context):
         # Parse response
         model_response = json.loads(response["body"].read())
         answer = model_response["results"][0]["outputText"]
-        
-        # Add RAG-specific metrics to the trace
-        HoneyHiveTracer.current_session().add_trace_metadata({
-            "request_id": request_id,
-            "context_length": len(context),
-            "query_length": len(query),
-            "answer_length": len(answer),
-            "operation": "rag",
-            "query": query
-        })
         
         return answer
         

@@ -6,7 +6,7 @@ import json
 from typing import Dict, Any, List, Optional, Tuple
 import openai
 from crewai import Agent
-from honeyhive.tracer.custom import trace
+from honeyhive import trace
 from config import OPENAI_MODEL
 from registry import (
     TaskDecomposition, SubTask, TaskType, ConversationContext, 
@@ -24,7 +24,7 @@ class AdvisoryTaskAnalyzer:
     def __init__(self):
         self.client = openai.Client()
     
-    @trace(config={"model": OPENAI_MODEL})
+    @trace(event_type="model")
     def analyze_client_inquiry(self, query: str, context: Optional[ConversationContext] = None) -> TaskDecomposition:
         """Decompose client inquiry into advisory subtasks with dependencies."""
         
@@ -123,7 +123,7 @@ class SpecialistRouter:
         self.client = openai.Client()
         self.specialist_pool = {name: agent_class() for name, agent_class in AGENT_REGISTRY.items()}
     
-    @trace(config={"model": OPENAI_MODEL})
+    @trace(event_type="model")
     def select_specialist_for_task(self, task: SubTask, available_specialists: Optional[List[str]] = None) -> Tuple[BaseSpecializedAgent, float]:
         """Select the best wealth advisory specialist for a specific task."""
         
@@ -196,7 +196,7 @@ class DelegationManager:
         self.delegation_history: List[DelegationDecision] = []
         self.client = openai.Client()
     
-    @trace(config={"model": OPENAI_MODEL})
+    @trace(event_type="model")
     def evaluate_delegation_need(self, specialist: BaseSpecializedAgent, task: SubTask, depth: int) -> Optional[DelegationDecision]:
         """Evaluate if task should be delegated to another specialist."""
         
@@ -361,7 +361,7 @@ class ClientAdvisoryOrchestrator:
         
         return results
     
-    @trace(config={"model": OPENAI_MODEL})
+    @trace(event_type="model")
     def _synthesize_advisory_response(self, original_query: str, decomposition: TaskDecomposition, results: Dict[str, Any]) -> str:
         """Synthesize all specialist findings into a cohesive client advisory response."""
         

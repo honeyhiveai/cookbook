@@ -5,7 +5,7 @@ Wealth Advisory Session Management and Main Workflow
 import pickle
 from datetime import datetime
 from typing import Dict, Any, Optional
-from honeyhive.tracer.custom import trace
+from honeyhive import trace
 from registry import ConversationContext
 from orchestration import ClientAdvisoryOrchestrator
 
@@ -193,11 +193,15 @@ def run(session_id: Optional[str] = None):
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    from honeyhive.tracer import HoneyHiveTracer
+    from honeyhive import HoneyHiveTracer
+    from openinference.instrumentation.crewai import CrewAIInstrumentor
+    from openinference.instrumentation.openai import OpenAIInstrumentor
     from config import HONEYHIVE_CONFIG
 
-    # Initialize HoneyHive at the beginning of main
-    HoneyHiveTracer.init(**HONEYHIVE_CONFIG)
+    # Initialize HoneyHive tracer and instrumentors
+    tracer = HoneyHiveTracer.init(**HONEYHIVE_CONFIG)
+    CrewAIInstrumentor().instrument(tracer_provider=tracer.provider)
+    OpenAIInstrumentor().instrument(tracer_provider=tracer.provider)
 
     # Run interactive advisory session (type 'exit' to end)
     run()
