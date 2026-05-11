@@ -23,8 +23,7 @@ Integration examples for AI observability and evaluation with HoneyHive.
 
 | Cookbook | Description |
 |----------|-------------|
-| [qdrant-cookbook](./qdrant-cookbook) | Integration with Qdrant vector database for RAG pipelines |
-| [chroma-cookbook](./chroma-cookbook) | Integration with Chroma vector database for RAG pipelines |
+| [qdrant-cookbook](./qdrant-cookbook) | RAG pipeline with Qdrant vector database and HoneyHive tracing |
 
 ### LLM Provider Integrations
 
@@ -38,12 +37,15 @@ Integration examples for AI observability and evaluation with HoneyHive.
 
 | Cookbook | Description |
 |----------|-------------|
-| [claims-summarizer-python](./claims-summarizer-python) | Process and summarize claims data using Python |
-| [claims-transcript-summarizer-js](./claims-transcript-summarizer-js) | Process and summarize transcript data for claims |
+| [claims-summarizer-python](./claims-summarizer-python) | Insurance claims summarization with AWS Bedrock and HoneyHive (Python) |
+
+### Legacy
+
+Older cookbooks that have not been updated to the latest SDK are in [legacy_cookbooks](./legacy_cookbooks).
 
 ## Getting Started
 
-Each cookbook contains its own README with specific instructions.
+Each cookbook contains its own README with specific instructions. All Python cookbooks use the v2 SDK (`honeyhive>=1.0.0`) with OpenInference instrumentors for automatic framework tracing.
 
 1. Sign up at [honeyhive.ai](https://honeyhive.ai) and get your API key
 2. Clone the repo:
@@ -56,8 +58,8 @@ Each cookbook contains its own README with specific instructions.
 ## Requirements
 
 - **Python 3.11+** for Python examples
-- **Node.js** for JavaScript/TypeScript examples
-- **API Keys** for relevant services (HoneyHive, OpenAI, etc.)
+- **Node.js 18+** for JavaScript examples
+- **API Keys** for relevant services (HoneyHive, OpenAI, AWS, Azure, etc.)
 
 ## Support
 

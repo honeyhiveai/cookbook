@@ -86,7 +86,6 @@ async def main(version: str) -> None:
 
     tracer = HoneyHiveTracer.init(
         api_key=os.getenv("HH_API_KEY"),
-        project=os.getenv("HH_PROJECT"),
         session_name=f"customer-support-{version}",
         source="cookbook",
     )

@@ -7,7 +7,7 @@ from enum import Enum
 from typing import List, Dict, Any, Union
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
-from honeyhive.tracer.custom import trace
+from honeyhive import trace
 from config import SERPAPI_KEY
 
 # ---------------------------------------------------------------------------

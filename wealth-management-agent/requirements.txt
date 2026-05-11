@@ -1,5 +1,8 @@
-crewai
+honeyhive>=1.0.0
+crewai[tools]>=1.10.0,<1.11.0
 openai
-honeyhive
+openinference-instrumentation-crewai
+openinference-instrumentation-openai
 pydantic
 requests
+python-dotenv

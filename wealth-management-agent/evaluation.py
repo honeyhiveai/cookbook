@@ -20,9 +20,7 @@ Evaluation Mode (HoneyHive):
 
 from datetime import datetime
 from typing import Dict, Any, Optional
-from honeyhive.tracer import HoneyHiveTracer
-from honeyhive.tracer.custom import trace
-from honeyhive import evaluate
+from honeyhive import evaluate, trace
 
 # Import all components from our refactored modules
 from config import HONEYHIVE_CONFIG
@@ -206,13 +204,11 @@ def run_evaluation():
         api_key=HONEYHIVE_CONFIG['api_key'],
         project=HONEYHIVE_CONFIG['project'],
         name='Wealth Advisory Platform Eval',
-        dataset=dataset,  # Pass dataset directly instead of dataset_id
-        evaluators=[],  # Server-side evaluators will handle evaluation
-        server_url=HONEYHIVE_CONFIG['server_url']
+        dataset=dataset,
+        evaluators=[],
     )
     
-    # Ensure all traces are flushed
-    HoneyHiveTracer.flush()
+
     
     print("\n" + "=" * 80)
     print("Evaluation complete. View results in HoneyHive dashboard.")
