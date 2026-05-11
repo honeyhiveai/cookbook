@@ -120,7 +120,6 @@ from openinference.instrumentation.openai import OpenAIInstrumentor
 # Initialize HoneyHive tracer and instrumentors
 tracer = HoneyHiveTracer.init(
     api_key=os.getenv("HH_API_KEY"),
-    project=os.getenv("HH_PROJECT"),
 )
 CrewAIInstrumentor().instrument(tracer_provider=tracer.provider)
 OpenAIInstrumentor().instrument(tracer_provider=tracer.provider)
@@ -217,7 +216,6 @@ def create_evaluation_dataset():
 evaluate(
     function=main,
     api_key=HONEYHIVE_CONFIG['api_key'],
-    project=HONEYHIVE_CONFIG['project'],
     name='Wealth Advisory Platform Eval',
     dataset=dataset,
     evaluators=[],
@@ -254,7 +252,6 @@ Create a `.env` file:
 
 ```bash
 HH_API_KEY=your-honeyhive-api-key
-HH_PROJECT=Wealth Advisory Platform
 OPENAI_API_KEY=your-openai-api-key
 SERPAPI_KEY=your-serpapi-key
 ```

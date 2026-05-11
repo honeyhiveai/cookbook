@@ -23,7 +23,6 @@ uv pip install -r requirements.txt
 2. Create a `.env` file:
 ```bash
 HH_API_KEY=your-honeyhive-api-key
-HH_PROJECT=aws-bedrock-examples
 AWS_ACCESS_KEY_ID=your-aws-access-key
 AWS_SECRET_ACCESS_KEY=your-aws-secret-key
 AWS_DEFAULT_REGION=us-east-1
@@ -38,7 +37,6 @@ from openinference.instrumentation.bedrock import BedrockInstrumentor
 
 tracer = HoneyHiveTracer.init(
     api_key=os.getenv("HH_API_KEY"),
-    project=os.getenv("HH_PROJECT"),
 )
 BedrockInstrumentor().instrument(tracer_provider=tracer.provider)
 ```

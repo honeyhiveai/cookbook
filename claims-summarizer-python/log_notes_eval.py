@@ -71,7 +71,7 @@ if __name__ == "__main__":
     evaluate(
         function=summarize_claim,
         hh_api_key=os.getenv("HH_API_KEY"),
-        hh_project=os.getenv("HH_PROJECT", "Insurance Claims Summarization"),
+        hh_project="Insurance Claims Summarization",
         name="Claims Summarizer Evaluation",
         dataset_id="your_dataset_id_here",  # Replace with your HoneyHive dataset ID
         evaluators=[],

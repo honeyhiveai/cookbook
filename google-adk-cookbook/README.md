@@ -66,7 +66,6 @@ uv pip install -r requirements.txt
 
 ```bash
 HH_API_KEY=your-honeyhive-api-key
-HH_PROJECT=your-project-name
 HH_API_URL=https://api.honeyhive.ai  # optional, override for non-production environments
 GOOGLE_API_KEY=your-gemini-api-key
 ```

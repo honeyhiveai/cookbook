@@ -38,7 +38,6 @@ Create a `.env` file:
 
 ```bash
 HH_API_KEY=your-honeyhive-api-key
-HH_PROJECT=Azure-OpenAI-traces
 AZURE_OPENAI_API_KEY=your-azure-openai-key
 AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
 ```
@@ -53,7 +52,6 @@ from openai import AzureOpenAI
 
 tracer = HoneyHiveTracer.init(
     api_key=os.getenv("HH_API_KEY"),
-    project=os.getenv("HH_PROJECT"),
 )
 OpenAIInstrumentor().instrument(tracer_provider=tracer.provider)
 

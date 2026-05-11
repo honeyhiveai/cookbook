@@ -22,7 +22,6 @@ load_dotenv(override=True)
 # Initialize HoneyHive tracer and OpenAI auto-instrumentation
 tracer = HoneyHiveTracer.init(
     api_key=os.getenv("HH_API_KEY"),
-    project=os.getenv("HH_PROJECT", "qdrant-rag-example"),
     session_name="qdrant-integration-demo",
 )
 OpenAIInstrumentor().instrument(tracer_provider=tracer.provider)

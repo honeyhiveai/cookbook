@@ -20,7 +20,6 @@ load_dotenv(override=True)
 # Initialize HoneyHive tracer and Bedrock auto-instrumentation
 tracer = HoneyHiveTracer.init(
     api_key=os.getenv("HH_API_KEY"),
-    project=os.getenv("HH_PROJECT", "aws-bedrock-examples"),
     session_name="advanced-bedrock-tracing",
 )
 BedrockInstrumentor().instrument(tracer_provider=tracer.provider)

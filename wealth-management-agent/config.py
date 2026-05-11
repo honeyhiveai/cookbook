@@ -32,7 +32,6 @@ if not SERPAPI_KEY:
 # HoneyHive configuration (all from environment; init is done in main.py)
 HONEYHIVE_CONFIG = {
     "api_key": os.getenv("HH_API_KEY"),
-    "project": os.getenv("HH_PROJECT", "Wealth Advisory Platform"),
     "source": os.getenv("HH_SOURCE", "dev"),
     "session_name": os.getenv("HH_SESSION_NAME", "Client Advisory Trace"),
 }

@@ -42,7 +42,6 @@ Create a `.env` file:
 
 ```bash
 HH_API_KEY=your-honeyhive-api-key
-HH_PROJECT=qdrant-rag-example
 OPENAI_API_KEY=your-openai-api-key
 ```
 
@@ -62,7 +61,6 @@ from openinference.instrumentation.openai import OpenAIInstrumentor
 
 tracer = HoneyHiveTracer.init(
     api_key=os.getenv("HH_API_KEY"),
-    project=os.getenv("HH_PROJECT"),
 )
 OpenAIInstrumentor().instrument(tracer_provider=tracer.provider)
 ```
