@@ -41,6 +41,8 @@ agentcore destroy
 - AWS credentials with Bedrock model access (Claude Sonnet 4.0 enabled in your account/region)
 - HoneyHive project + API key
 
+For full AWS resource details, IAM requirements, and service quotas see [infra_reqs.md](infra_reqs.md).
+
 ## Verify in HoneyHive Studio
 
 Open HoneyHive Studio and confirm spans are typed `agent` / `llm` / `tool`. If everything shows as `tool`, auto-instrumentation didn't attach — verify that `HoneyHiveTracer.init(...)` runs **before** `from strands import ...` in `agent.py`.
