@@ -2,6 +2,18 @@
 
 A minimal, single-file Strands agent deployed via [AWS Bedrock AgentCore](https://aws.github.io/bedrock-agentcore-starter-toolkit/), with HoneyHive observability wired in.
 
+This is the reference output of HoneyHive's `honeyhive-instrument` skill. To produce it yourself in your own repo:
+
+```bash
+# Install the skill
+gh skill install honeyhiveai/skills honeyhive-instrument
+
+# Then in VS Code Copilot agent mode (Chat view), ask:
+# "Instrument this Strands agent with HoneyHive."
+```
+
+Copilot detects the Strands + AgentCore stack, installs honeyhive + the OpenInference instrumentor, initializes the tracer, and validates that traces appear in HoneyHive Studio.
+
 ## Quickstart
 
 ```bash
