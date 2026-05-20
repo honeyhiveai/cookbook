@@ -54,15 +54,8 @@ tracer = HoneyHiveTracer.init(
 from strands import Agent, tool  # noqa: E402
 from strands.models import BedrockModel  # noqa: E402
 
-# Default to Claude Sonnet 4.0 cross-region inference profile.
-# Override via env var for a different region or to use an
-# application-inference-profile ARN (e.g. for per-tenant cost tracking).
-#
-# Nationwide-style application inference profile:
-# BEDROCK_MODEL_ID=arn:aws:bedrock:us-east-1:123456789012:application-inference-profile/abc123
-#
-# Strands' BedrockModel accepts either a model ID or an inference-profile ARN
-# as `model_id` — no other code changes needed for the swap.
+# Override via BEDROCK_MODEL_ID to use a different model or an
+# application-inference-profile ARN for per-tenant cost tracking.
 DEFAULT_MODEL_ID = "us.anthropic.claude-sonnet-4-20250514-v1:0"
 MODEL_ID = os.getenv("BEDROCK_MODEL_ID", DEFAULT_MODEL_ID)
 AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
