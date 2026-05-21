@@ -2,7 +2,7 @@
 
 Pure Strands + OpenAI. **No HoneyHive code, no eval harness** — just `agent.py`.
 
-Use this folder for Steps 1–2 of the skill walkthrough (run baseline → instrument). For evals and a reference integration, use [`config-as-code/`](../config-as-code/).
+Use this folder for Steps 1–2 of the skill walkthrough (run baseline → instrument). For evals and a reference integration, use [`honeyhive-integrated/`](../honeyhive-integrated/).
 
 Open **`no-honeyhive/`** in your coding agent so nothing HoneyHive-related is in the tree until the instrument skill adds it.
 
@@ -59,7 +59,7 @@ Check traces in [HoneyHive Studio](https://app.us.honeyhive.ai/traces/sessions).
 
 ## Steps 3–4 — Evaluate & improve
 
-This folder stays minimal on purpose. For evals and a full reference stack, switch to [`config-as-code/`](../config-as-code/) — or ask the **evaluate** / **improve** skills here after Step 2 and let them add what you need.
+This folder stays minimal on purpose. For evals and a full reference stack, switch to [`honeyhive-integrated/`](../honeyhive-integrated/) — or ask the **evaluate** / **improve** skills here after Step 2 and let them add what you need.
 
 ---
 

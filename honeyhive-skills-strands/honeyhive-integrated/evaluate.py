@@ -30,7 +30,7 @@ from agent import DEFAULT_MODEL, run_agent_for_eval  # noqa: E402
 HONEYHIVE_DIR = Path(__file__).resolve().parent / ".honeyhive"
 JUDGE_MODEL = os.getenv("OPENAI_JUDGE_MODEL", os.getenv("OPENAI_MODEL", "gpt-5-mini"))
 MAX_WORKERS = int(os.getenv("EVAL_MAX_WORKERS", "4"))
-EXPERIMENT_NAME = "honeyhive-skills-strands-config-as-code-eval"
+EXPERIMENT_NAME = "honeyhive-skills-strands-integrated-eval"
 
 judge_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 

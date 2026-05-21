@@ -1,8 +1,8 @@
-# HoneyHive config as code — Strands reference
+# HoneyHive integrated — Strands reference
 
 Strands + OpenAI agent **pre-wired with HoneyHive tracing** and an eval harness driven by [config as code](https://docs.honeyhive.ai/v2/sdk-reference/cli-config-as-code): datasets, datapoints, and evaluators live under `.honeyhive/` and sync to HoneyHive with the CLI.
 
-Open **this folder** (`config-as-code/`) in your coding agent when working on evals or improvements.
+Open **this folder** (`honeyhive-integrated/`) in your coding agent when working on evals or improvements.
 
 ## What you need
 
@@ -23,12 +23,12 @@ npx skills add honeyhiveai/skills --skill '*'
 Then work in this folder:
 
 ```bash
-cd config-as-code
+cd honeyhive-integrated
 cp .env.example .env   # fill in keys
 uv sync
 ```
 
-Open **`config-as-code/`** in your coding agent and start a **new** chat.
+Open **`honeyhive-integrated/`** in your coding agent and start a **new** chat.
 
 ---
 
@@ -87,5 +87,5 @@ Improve this agent using HoneyHive traces.
 ## Stuck?
 
 ```text
-I'm stuck on honeyhive-skills-strands/config-as-code. Read README.md, check OPENAI_API_KEY and HH_API_KEY in .env, and fix.
+I'm stuck on honeyhive-skills-strands/honeyhive-integrated. Read README.md, check OPENAI_API_KEY and HH_API_KEY in .env, and fix.
 ```

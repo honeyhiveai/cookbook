@@ -27,7 +27,7 @@ from strands.models.openai import OpenAIModel  # noqa: E402
 
 DEFAULT_MODEL = os.getenv("OPENAI_MODEL", "gpt-5-mini")
 ALLOWED_CALC_CHARS = set("0123456789.+-*/() ")
-AGENT_NAME = "honeyhive-skills-strands-config-as-code"
+AGENT_NAME = "honeyhive-skills-strands-integrated"
 
 SYSTEM_PROMPT = """You are a helpful assistant with access to tools.
 - Use `calculator` for any arithmetic, even simple sums.
