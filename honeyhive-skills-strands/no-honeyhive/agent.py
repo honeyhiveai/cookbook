@@ -82,8 +82,7 @@ def message_to_text(message: object) -> str:
 
 
 def run_agent(prompt: str) -> str:
-    result = agent(prompt)
-    return message_to_text(result.message)
+    return message_to_text(agent(prompt).message)
 
 
 def main() -> None:

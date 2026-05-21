@@ -1,0 +1,10 @@
+metadata:
+  external_id: multiply-17-23
+inputs:
+  prompt: What is 17 * 23?
+ground_truth:
+  answer: "391"
+  requires_calculation: true
+  criteria: >-
+    Used the calculator (or showed equivalent tool-backed steps); did not
+    only guess 391 from memory with no sign of computation.

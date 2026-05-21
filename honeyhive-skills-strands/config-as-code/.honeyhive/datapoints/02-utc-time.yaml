@@ -1,0 +1,9 @@
+metadata:
+  external_id: utc-time
+inputs:
+  prompt: What is the current time in UTC?
+ground_truth:
+  pattern: \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}
+  criteria: >-
+    Used current_time (or clearly relied on its output); did not invent
+    a plausible-looking timestamp from memory alone.

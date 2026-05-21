@@ -384,7 +384,7 @@ wheels = [
 ]
 
 [[package]]
-name = "honeyhive-skills-strands-integrated"
+name = "honeyhive-skills-strands-config-as-code"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [

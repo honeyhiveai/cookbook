@@ -1,4 +1,14 @@
-"""Shared HoneyHive experiment dataset and evaluators for the Strands agent."""
+"""
+Evaluate the Strands agent with HoneyHive experiments.
+
+Run:
+    uv run python evaluate.py
+
+Datapoints load from `.honeyhive/datapoints/` (config as code). HoneyHive evaluate()
+runs the agent over the dataset and scores each datapoint with:
+  - answer_correct  — code check (numeric answer, patterns, required values)
+  - task_quality    — LLM judge (tool use vs guessing; skips re-checking numbers)
+"""
 
 from __future__ import annotations
 
@@ -6,14 +16,22 @@ import json
 import math
 import os
 import re
-from collections.abc import Callable
+from pathlib import Path
 
+import yaml
+from dotenv import load_dotenv
+from honeyhive import evaluate
 from openai import OpenAI
 
+load_dotenv(override=True)
+
+from agent import DEFAULT_MODEL, run_agent_for_eval  # noqa: E402
+
+HONEYHIVE_DIR = Path(__file__).resolve().parent / ".honeyhive"
 JUDGE_MODEL = os.getenv("OPENAI_JUDGE_MODEL", os.getenv("OPENAI_MODEL", "gpt-5-mini"))
 MAX_WORKERS = int(os.getenv("EVAL_MAX_WORKERS", "4"))
-# Strands: one in-flight invocation per Agent instance; evaluate() uses a fresh
-# Agent per datapoint via make_eval_runner() so workers can run in parallel.
+EXPERIMENT_NAME = "honeyhive-skills-strands-config-as-code-eval"
+
 judge_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 JUDGE_SYSTEM = """You are a QA judge for a Strands assistant with two tools:
@@ -26,18 +44,12 @@ number or timestamp string is correct when the rubric says the code check handle
 
 Your primary job on arithmetic prompts: detect **guessing** — stating a correct-looking
 result with no evidence the agent used the calculator or an equivalent step-by-step
-computation. Fail when the response looks like memorization or hallucination rather
-than tool-backed work (e.g. bare "391" with no tool context for 17*23; a huge integer
-for 2**50 with no sign of calculator use after ** was rejected).
+computation.
 
 Score pass/fail as binary:
   1 - Meets the success criteria; for math, shows evidence of calculation/tool use.
-  0 - Guessed without calculating when calculation was required; ignored a tool error;
-      used the wrong tool; skipped a required part; fabricated unsupported data.
-
-Formatting leniency (still pass):
-- Prose around a correct answer is fine.
-- Equivalent numeric formatting is fine (handled by code check when applicable).
+  0 - Guessed without calculating when required; ignored a tool error; skipped a part;
+      fabricated unsupported data.
 
 Still fail:
 - Correct numeric answer but clearly guessed without tool use when calculation was required.
@@ -47,90 +59,28 @@ Still fail:
 
 Return strictly JSON: {"score": 0 | 1}."""
 
-DATASET = [
-    {
-        "inputs": {"prompt": "What is 17 * 23?"},
-        "ground_truth": {
-            "answer": "391",
-            "requires_calculation": True,
-            "criteria": (
-                "Used the calculator (or showed equivalent tool-backed steps); did not "
-                "only guess 391 from memory with no sign of computation."
-            ),
-        },
-    },
-    {
-        "inputs": {"prompt": "What is the current time in UTC?"},
-        "ground_truth": {
-            "pattern": r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}",
-            "criteria": (
-                "Used current_time (or clearly relied on its output); did not invent "
-                "a plausible-looking timestamp from memory alone."
-            ),
-        },
-    },
-    {
-        "inputs": {"prompt": "What is 2 ** 50?"},
-        "ground_truth": {
-            "answer": "1125899906842624",
-            "requires_calculation": True,
-            "criteria": (
-                "After ** was rejected, computed the result via calculator-friendly "
-                "steps (e.g. repeated multiplication); did not guess the huge "
-                "integer from memory alone."
-            ),
-        },
-    },
-    {
-        "inputs": {"prompt": "What is the current time in Tokyo?"},
-        "ground_truth": {
-            "criteria": (
-                "Explains that only UTC is supported by current_time and does not "
-                "fabricate a Tokyo local time."
-            ),
-        },
-    },
-    {
-        "inputs": {
-            "prompt": (
-                "First get the current UTC time, then use the calculator to add "
-                "17 and 23. Reply with both results."
-            ),
-        },
-        "ground_truth": {
-            "must_mention_all": ["40"],
-            "pattern": r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}",
-            "requires_calculation": True,
-            "criteria": (
-                "Used current_time for UTC and calculator for 17+23; did not guess "
-                "either result without tool-backed evidence."
-            ),
-        },
-    },
-    {
-        "inputs": {
-            "prompt": "Use the calculator on 10 / 0 and tell me exactly what happens.",
-        },
-        "ground_truth": {
-            "criteria": (
-                "Reports the calculator/tool error for division by zero instead of "
-                "returning a made-up numeric result."
-            ),
-        },
-    },
-]
+
+def load_dataset() -> list[dict]:
+    """Load datapoints from .honeyhive/datapoints/*.yaml (config as code)."""
+    datapoints_dir = HONEYHIVE_DIR / "datapoints"
+    if not datapoints_dir.is_dir():
+        raise FileNotFoundError(f"Missing datapoints directory: {datapoints_dir}")
+
+    dataset: list[dict] = []
+    for path in sorted(datapoints_dir.glob("*.yaml")):
+        raw = yaml.safe_load(path.read_text())
+        entry: dict = {"inputs": raw["inputs"]}
+        if raw.get("ground_truth") is not None:
+            entry["ground_truth"] = raw["ground_truth"]
+        dataset.append(entry)
+    return dataset
+
+
+DATASET = load_dataset()
 
 _NUMBER_PATTERN = re.compile(
     r"[-+]?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?|\.\d+"
 )
-
-
-def make_run_datapoint(run_agent: Callable[[str], str]) -> Callable[[dict], dict]:
-    def run_strands_datapoint(datapoint: dict) -> dict:
-        prompt = datapoint["inputs"]["prompt"]
-        return {"prompt": prompt, "response": run_agent(prompt)}
-
-    return run_strands_datapoint
 
 
 def _parse_number(raw: str) -> float | None:
@@ -144,12 +94,11 @@ def _parse_number(raw: str) -> float | None:
 
 
 def _extract_numbers(text: str) -> list[float]:
-    numbers: list[float] = []
-    for match in _NUMBER_PATTERN.finditer(text):
-        parsed = _parse_number(match.group(0))
-        if parsed is not None:
-            numbers.append(parsed)
-    return numbers
+    return [
+        parsed
+        for match in _NUMBER_PATTERN.finditer(text)
+        if (parsed := _parse_number(match.group(0))) is not None
+    ]
 
 
 def _numbers_equivalent(expected: str, response: str) -> bool:
@@ -174,7 +123,7 @@ def _numbers_equivalent(expected: str, response: str) -> bool:
 
 
 def answer_correct(outputs: dict, inputs: dict, ground_truth: dict | None) -> float:
-    """Deterministic check: correct numeric answer, patterns, and required values."""
+    """Code evaluator: correct numeric answer, patterns, and required values."""
     if not ground_truth:
         return 1.0
 
@@ -201,7 +150,7 @@ def answer_correct(outputs: dict, inputs: dict, ground_truth: dict | None) -> fl
 
 
 def task_quality(outputs: dict, inputs: dict, ground_truth: dict | None) -> float:
-    """LLM judge: tool use and anti-guessing; numeric correctness is answer_correct."""
+    """LLM evaluator: tool use and anti-guessing (answer_correct handles numbers)."""
     if not ground_truth or not ground_truth.get("criteria"):
         return 1.0
 
@@ -248,8 +197,7 @@ def task_quality(outputs: dict, inputs: dict, ground_truth: dict | None) -> floa
     return score
 
 
-def print_evaluator_comparison(result, dataset: list[dict]) -> None:
-    """Print side-by-side code vs LLM judge scores per datapoint."""
+def _print_evaluator_comparison(result, dataset: list[dict]) -> None:
     if not result.datapoints:
         print("\nNo per-datapoint metrics returned from backend.")
         return
@@ -263,13 +211,37 @@ def print_evaluator_comparison(result, dataset: list[dict]) -> None:
         scores = {m.name: m.value for m in dp.metrics}
         code = scores.get("answer_correct")
         judge = scores.get("task_quality")
-        if code == judge:
-            agree += 1
-            flag = "agree"
-        else:
-            flag = "DIFF"
+        agree += code == judge
+        flag = "agree" if code == judge else "DIFF"
         print(f"{idx + 1:2}. [{flag:5}] code={code} judge={judge} | {short}")
 
-    total = len(result.datapoints)
     print("-" * 72)
-    print(f"Agreement: {agree}/{total}")
+    print(f"Agreement: {agree}/{len(result.datapoints)}")
+
+
+def _run_datapoint(datapoint: dict) -> dict:
+    prompt = datapoint["inputs"]["prompt"]
+    return {"prompt": prompt, "response": run_agent_for_eval(prompt)}
+
+
+if __name__ == "__main__":
+    print(f"Project: {os.getenv('HH_PROJECT', 'Strands')}")
+    print(f"Agent model: {os.getenv('OPENAI_MODEL', DEFAULT_MODEL)}")
+    print(f"Judge model: {JUDGE_MODEL}")
+    print(f"Max workers: {MAX_WORKERS}")
+
+    result = evaluate(
+        function=_run_datapoint,
+        dataset=DATASET,
+        evaluators=[answer_correct, task_quality],
+        name=EXPERIMENT_NAME,
+        max_workers=MAX_WORKERS,
+        verbose=False,
+    )
+
+    print(f"Run ID: {result.run_id}")
+    print(f"Success: {result.success}")
+    if result.metrics:
+        print(f"Metrics: {result.metrics.list_metrics()}")
+
+    _print_evaluator_comparison(result, DATASET)

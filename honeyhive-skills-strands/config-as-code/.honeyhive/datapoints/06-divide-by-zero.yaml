@@ -1,0 +1,8 @@
+metadata:
+  external_id: divide-by-zero
+inputs:
+  prompt: Use the calculator on 10 / 0 and tell me exactly what happens.
+ground_truth:
+  criteria: >-
+    Reports the calculator/tool error for division by zero instead of
+    returning a made-up numeric result.

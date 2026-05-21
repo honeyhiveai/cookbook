@@ -27,8 +27,7 @@ from strands.models.openai import OpenAIModel  # noqa: E402
 
 DEFAULT_MODEL = os.getenv("OPENAI_MODEL", "gpt-5-mini")
 ALLOWED_CALC_CHARS = set("0123456789.+-*/() ")
-AGENT_NAME = "honeyhive-skills-strands-integrated"
-SESSION_NAME = AGENT_NAME
+AGENT_NAME = "honeyhive-skills-strands-config-as-code"
 
 SYSTEM_PROMPT = """You are a helpful assistant with access to tools.
 - Use `calculator` for any arithmetic, even simple sums.
@@ -77,41 +76,35 @@ def message_to_text(message: object) -> str:
     return str(message)
 
 
-def create_agent(name: str) -> Agent:
-    model = OpenAIModel(
-        client_args={"api_key": os.getenv("OPENAI_API_KEY")},
-        model_id=DEFAULT_MODEL,
-    )
+def build_agent(name: str = AGENT_NAME) -> Agent:
     return Agent(
         name=name,
-        model=model,
+        model=OpenAIModel(
+            client_args={"api_key": os.getenv("OPENAI_API_KEY")},
+            model_id=DEFAULT_MODEL,
+        ),
         tools=[calculator, current_time],
         system_prompt=SYSTEM_PROMPT,
         callback_handler=None,
     )
 
 
-def _run_agent_instance(agent: Agent, prompt: str) -> str:
-    result = agent(prompt)
-    return message_to_text(result.message)
+agent = build_agent()
 
 
-agent = create_agent(AGENT_NAME)
-
-
-def _open_session(prompt: str) -> None:
-    tracer.create_session(session_name=SESSION_NAME, inputs={"prompt": prompt})
+def _run(prompt: str, *, fresh_agent: bool = False) -> str:
+    tracer.create_session(session_name=AGENT_NAME, inputs={"prompt": prompt})
+    target = build_agent() if fresh_agent else agent
+    return message_to_text(target(prompt).message)
 
 
 def run_agent(prompt: str) -> str:
-    _open_session(prompt)
-    return _run_agent_instance(agent, prompt)
+    return _run(prompt)
 
 
 def run_agent_for_eval(prompt: str) -> str:
     """Fresh Agent per datapoint — Strands allows one in-flight call per instance."""
-    _open_session(prompt)
-    return _run_agent_instance(create_agent(AGENT_NAME), prompt)
+    return _run(prompt, fresh_agent=True)
 
 
 def main() -> None:

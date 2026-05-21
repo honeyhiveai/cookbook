@@ -1,0 +1,11 @@
+metadata:
+  external_id: power-2-50
+inputs:
+  prompt: What is 2 ** 50?
+ground_truth:
+  answer: "1125899906842624"
+  requires_calculation: true
+  criteria: >-
+    After ** was rejected, computed the result via calculator-friendly
+    steps (e.g. repeated multiplication); did not guess the huge
+    integer from memory alone.

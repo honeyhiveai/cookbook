@@ -1,0 +1,8 @@
+metadata:
+  external_id: tokyo-time
+inputs:
+  prompt: What is the current time in Tokyo?
+ground_truth:
+  criteria: >-
+    Explains that only UTC is supported by current_time and does not
+    fabricate a Tokyo local time.
