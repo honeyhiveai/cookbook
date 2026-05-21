@@ -1,13 +1,11 @@
 # HoneyHive Skills + Strands
 
-Two self-contained Strands + OpenAI cookbooks for learning HoneyHive skills without cross-contamination.
+Two self-contained Strands + OpenAI tracks.
 
 | Folder | Purpose |
 |--------|---------|
-| [`no-honeyhive/`](no-honeyhive/) | Baseline agent — walk through **instrument → evaluate → improve** skills from scratch |
-| [`honeyhive-integrated/`](honeyhive-integrated/) | Reference implementation with tracing + eval harness already wired |
-
-Each folder has its own `agent.py`, `evaluate.py`, `README.md`, and dependencies. Open the folder you're working in as your agent workspace root.
+| [`no-honeyhive/`](no-honeyhive/) | Pure Strands — **`agent.py` only**. Walk through **instrument** skill (Steps 1–2). |
+| [`honeyhive-integrated/`](honeyhive-integrated/) | Reference — tracing + **`evaluate.py`** harness. Run evals here. |
 
 ## Setup (once)
 
@@ -21,13 +19,13 @@ The CLI is interactive — choose which coding agent to install into. Skills ins
 
 ## Which folder?
 
-- **Learning the skills?** → open [`no-honeyhive/`](no-honeyhive/) and follow its README.
-- **Running evals against a known-good integration?** → open [`honeyhive-integrated/`](honeyhive-integrated/) and follow its README.
+- **Learning instrument on a clean baseline?** → [`no-honeyhive/`](no-honeyhive/)
+- **Running evals or checking a known-good integration?** → [`honeyhive-integrated/`](honeyhive-integrated/)
 
 ## Stuck?
 
 ```text
-I'm stuck on honeyhive-skills-strands. Read the README in the folder I'm working in, check OPENAI_API_KEY and HH_API_KEY in .env, and fix.
+I'm stuck on honeyhive-skills-strands. Read the README in the folder I'm working in and fix.
 ```
 
 Re-run `npx skills add honeyhiveai/skills --skill '*'`, pick your agent, then **start a new chat** in the subfolder you're using.

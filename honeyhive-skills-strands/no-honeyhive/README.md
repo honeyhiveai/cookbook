@@ -1,13 +1,15 @@
 # No HoneyHive — Strands baseline
 
-Strands + OpenAI agent with **no HoneyHive wiring in code**. Use this folder for the instrument → evaluate → improve skill walkthrough.
+Pure Strands + OpenAI. **No HoneyHive code, no eval harness** — just `agent.py`.
 
-Open **this folder** (`no-honeyhive/`) in your coding agent so the baseline stays clean and separate from `honeyhive-integrated/`.
+Use this folder for Steps 1–2 of the skill walkthrough (run baseline → instrument). For evals and a reference integration, use [`honeyhive-integrated/`](../honeyhive-integrated/).
+
+Open **`no-honeyhive/`** in your coding agent so nothing HoneyHive-related is in the tree until the instrument skill adds it.
 
 ## What you need
 
 - [OpenAI API key](https://platform.openai.com/api-keys) → `OPENAI_API_KEY` in `.env`
-- [HoneyHive API key](https://app.us.honeyhive.ai/settings/project/keys) → `HH_API_KEY` in `.env` (before Step 2)
+- [HoneyHive API key](https://app.us.honeyhive.ai/settings/project/keys) → add `HH_API_KEY` to `.env` before Step 2
 
 ## Setup
 
@@ -23,7 +25,7 @@ Then work in this folder:
 
 ```bash
 cd no-honeyhive
-cp .env.example .env   # fill in keys
+cp .env.example .env   # fill in OPENAI_API_KEY
 uv sync
 ```
 
@@ -55,28 +57,14 @@ Check traces in [HoneyHive Studio](https://app.us.honeyhive.ai/traces/sessions).
 
 ---
 
-## Step 3 — Experiment
+## Steps 3–4 — Evaluate & improve
 
-```text
-Evaluate agent.py with HoneyHive.
-```
-
-```bash
-uv run python evaluate.py
-```
-
----
-
-## Step 4 — Improve
-
-```text
-Improve this agent using HoneyHive traces.
-```
+This folder stays minimal on purpose. For evals and a full reference stack, switch to [`honeyhive-integrated/`](../honeyhive-integrated/) — or ask the **evaluate** / **improve** skills here after Step 2 and let them add what you need.
 
 ---
 
 ## Stuck?
 
 ```text
-I'm stuck on honeyhive-skills-strands/no-honeyhive. Read README.md, check OPENAI_API_KEY and HH_API_KEY in .env, and fix.
+I'm stuck on honeyhive-skills-strands/no-honeyhive. Read README.md, check OPENAI_API_KEY in .env, and fix.
 ```
