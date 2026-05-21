@@ -59,26 +59,24 @@ def current_time(timezone_name: str = "UTC") -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-model = OpenAIModel(
-    client_args={"api_key": os.getenv("OPENAI_API_KEY")},
-    model_id=DEFAULT_MODEL,
-)
+def message_to_text(message: object) -> str:
+    if not isinstance(message, dict):
+        return str(message)
+    parts = message.get("content", [])
+    text = " ".join(p.get("text", "") for p in parts if isinstance(p, dict))
+    return text or str(message)
+
 
 agent = Agent(
     name="honeyhive-skills-strands-no-honeyhive",
-    model=model,
+    model=OpenAIModel(
+        client_args={"api_key": os.getenv("OPENAI_API_KEY")},
+        model_id=DEFAULT_MODEL,
+    ),
     tools=[calculator, current_time],
     system_prompt=SYSTEM_PROMPT,
     callback_handler=None,
 )
-
-
-def message_to_text(message: object) -> str:
-    if isinstance(message, dict):
-        parts = message.get("content", [])
-        text = " ".join(p.get("text", "") for p in parts if isinstance(p, dict))
-        return text or str(message)
-    return str(message)
 
 
 def run_agent(prompt: str) -> str:

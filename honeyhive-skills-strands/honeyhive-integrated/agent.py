@@ -69,16 +69,16 @@ def current_time(timezone_name: str = "UTC") -> str:
 
 
 def message_to_text(message: object) -> str:
-    if isinstance(message, dict):
-        parts = message.get("content", [])
-        text = " ".join(p.get("text", "") for p in parts if isinstance(p, dict))
-        return text or str(message)
-    return str(message)
+    if not isinstance(message, dict):
+        return str(message)
+    parts = message.get("content", [])
+    text = " ".join(p.get("text", "") for p in parts if isinstance(p, dict))
+    return text or str(message)
 
 
-def build_agent(name: str = AGENT_NAME) -> Agent:
+def build_agent() -> Agent:
     return Agent(
-        name=name,
+        name=AGENT_NAME,
         model=OpenAIModel(
             client_args={"api_key": os.getenv("OPENAI_API_KEY")},
             model_id=DEFAULT_MODEL,
@@ -92,19 +92,15 @@ def build_agent(name: str = AGENT_NAME) -> Agent:
 agent = build_agent()
 
 
-def _run(prompt: str, *, fresh_agent: bool = False) -> str:
-    tracer.create_session(session_name=AGENT_NAME, inputs={"prompt": prompt})
-    target = build_agent() if fresh_agent else agent
-    return message_to_text(target(prompt).message)
-
-
 def run_agent(prompt: str) -> str:
-    return _run(prompt)
+    tracer.create_session(session_name=AGENT_NAME, inputs={"prompt": prompt})
+    return message_to_text(agent(prompt).message)
 
 
 def run_agent_for_eval(prompt: str) -> str:
     """Fresh Agent per datapoint — Strands allows one in-flight call per instance."""
-    return _run(prompt, fresh_agent=True)
+    tracer.create_session(session_name=AGENT_NAME, inputs={"prompt": prompt})
+    return message_to_text(build_agent()(prompt).message)
 
 
 def main() -> None:
