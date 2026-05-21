@@ -17,6 +17,7 @@ Integration examples for AI observability and evaluation with HoneyHive.
 
 | Cookbook | Description |
 |----------|-------------|
+| [honeyhive-skills-strands](./honeyhive-skills-strands) | Strands + OpenAI baseline for trying HoneyHive Agent Skills (`npx skills`) |
 | [cursor-sdk-honeyhive](./cursor-sdk-honeyhive) | HoneyHive tracing for Cursor SDK agent runs and tool calls |
 
 ### RAG & Vector Databases
