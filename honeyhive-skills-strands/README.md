@@ -1,13 +1,15 @@
 # HoneyHive Skills + Strands
 
-Strands + OpenAI baseline (no HoneyHive in code yet).
+Two self-contained Strands + OpenAI cookbooks for learning HoneyHive skills without cross-contamination.
 
-## What you need
+| Folder | Purpose |
+|--------|---------|
+| [`no-honeyhive/`](no-honeyhive/) | Baseline agent — walk through **instrument → evaluate → improve** skills from scratch |
+| [`honeyhive-integrated/`](honeyhive-integrated/) | Reference implementation with tracing + eval harness already wired |
 
-- [OpenAI API key](https://platform.openai.com/api-keys) → `OPENAI_API_KEY` in `.env`
-- [HoneyHive API key](https://app.us.honeyhive.ai/settings/project/keys) → `HH_API_KEY` in `.env` (before instrumenting)
+Each folder has its own `agent.py`, `evaluate.py`, `README.md`, and dependencies. Open the folder you're working in as your agent workspace root.
 
-## Setup
+## Setup (once)
 
 ```bash
 git clone https://github.com/honeyhiveai/cookbook.git
@@ -15,50 +17,17 @@ cd cookbook/honeyhive-skills-strands
 npx skills add honeyhiveai/skills --skill '*'
 ```
 
-The CLI is interactive — choose which coding agent to install into. Then open this folder in **that** agent and start a **new** chat (skills load only in sessions started after install).
+The CLI is interactive — choose which coding agent to install into. Skills install at this level and apply when you open either subfolder.
 
----
+## Which folder?
 
-## Step 1 — Baseline
-
-```text
-Set up and run agent.py here. Use uv if available.
-```
-
----
-
-## Step 2 — Instrument
-
-Have your HoneyHive key ready to paste when asked.
-
-```text
-Instrument this project with HoneyHive.
-```
-
-Check traces in [HoneyHive Studio](https://app.honeyhive.ai).
-
----
-
-## Step 3 — Experiment (optional)
-
-```text
-Evaluate agent.py with HoneyHive.
-```
-
----
-
-## Step 4 — Improve (optional)
-
-```text
-Improve this agent using HoneyHive traces.
-```
-
----
+- **Learning the skills?** → open [`no-honeyhive/`](no-honeyhive/) and follow its README.
+- **Running evals against a known-good integration?** → open [`honeyhive-integrated/`](honeyhive-integrated/) and follow its README.
 
 ## Stuck?
 
 ```text
-I'm stuck on honeyhive-skills-strands. Read README.md, check OPENAI_API_KEY and HH_API_KEY in .env, and fix.
+I'm stuck on honeyhive-skills-strands. Read the README in the folder I'm working in, check OPENAI_API_KEY and HH_API_KEY in .env, and fix.
 ```
 
-Re-run `npx skills add honeyhiveai/skills --skill '*'`, pick your agent, then **start a new chat** in this folder.
+Re-run `npx skills add honeyhiveai/skills --skill '*'`, pick your agent, then **start a new chat** in the subfolder you're using.
