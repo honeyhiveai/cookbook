@@ -23,6 +23,12 @@
     "onlyBuiltDependencies": [
       "esbuild",
       "sqlite3"
-    ]
+    ],
+    "overrides": {
+      "@tootallnate/once": "^2.0.1",
+      "axios": "^1.15.2",
+      "tar": "^7.5.11",
+      "undici": "^6.24.0"
+    }
   }
 }
