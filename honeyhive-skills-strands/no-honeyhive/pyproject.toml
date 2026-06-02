@@ -1,9 +1,8 @@
 [project]
-name = "honeyhive-skills-strands"
+name = "honeyhive-skills-strands-no-honeyhive"
 version = "0.1.0"
 requires-python = ">=3.11"
 dependencies = [
     "strands-agents[openai]>=1.19.0",
     "python-dotenv>=1.0.0",
-    "honeyhive",
 ]

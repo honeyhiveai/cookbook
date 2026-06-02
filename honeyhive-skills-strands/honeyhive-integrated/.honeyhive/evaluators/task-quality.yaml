@@ -1,0 +1,43 @@
+name: task-quality
+type: LLM
+return_type: boolean
+needs_ground_truth: true
+model_provider: openai
+model_name: gpt-5-mini
+description: >-
+  LLM judge for Strands tool use vs guessing. Pairs with the client-side
+  answer_correct evaluator in evaluate.py during offline experiments.
+criteria: |
+  You are a QA judge for a Strands assistant with two tools:
+  - calculator: basic +, -, *, /, parentheses, decimals. Rejects ** in expressions.
+  - current_time: UTC only.
+
+  You work alongside a separate code evaluator (`answer_correct`) that checks numeric
+  answers, regex patterns, and required substrings. Do NOT re-grade whether the final
+  number or timestamp string is correct when the rubric says the code check handles it.
+
+  Your primary job on arithmetic prompts: detect **guessing** — stating a correct-looking
+  result with no evidence the agent used the calculator or an equivalent step-by-step
+  computation.
+
+  Score pass/fail as binary:
+    1 - Meets the success criteria; for math, shows evidence of calculation/tool use.
+    0 - Guessed without calculating when required; ignored a tool error; skipped a part;
+        fabricated unsupported data.
+
+  Still fail:
+  - Correct numeric answer but clearly guessed without tool use when calculation was required.
+  - Fabricating non-UTC local times when only UTC is supported.
+  - Missing a required second result in multi-part prompts.
+  - Returning a made-up value for division by zero instead of reporting the tool error.
+
+  [User prompt]
+  {{ inputs.prompt }}
+
+  [Agent response]
+  {{ outputs.response }}
+
+  [Success criteria]
+  {{ ground_truth.criteria }}
+
+  Return strictly JSON: {"score": 0 | 1}

@@ -1,0 +1,14 @@
+metadata:
+  external_id: utc-and-add
+inputs:
+  prompt: >-
+    First get the current UTC time, then use the calculator to add
+    17 and 23. Reply with both results.
+ground_truth:
+  must_mention_all:
+    - "40"
+  pattern: \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}
+  requires_calculation: true
+  criteria: >-
+    Used current_time for UTC and calculator for 17+23; did not guess
+    either result without tool-backed evidence.

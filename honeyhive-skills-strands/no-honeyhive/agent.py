@@ -17,7 +17,20 @@ from strands.models.openai import OpenAIModel
 
 load_dotenv(override=True)
 
-DEFAULT_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+DEFAULT_MODEL = os.getenv("OPENAI_MODEL", "gpt-5-mini")
+ALLOWED_CALC_CHARS = set("0123456789.+-*/() ")
+
+SYSTEM_PROMPT = """You are a helpful assistant with access to tools.
+- Use `calculator` for any arithmetic, even simple sums.
+- Use `current_time` whenever the user asks about time or dates.
+- If a tool errors, try another valid approach when you can (e.g. rewrite the
+  expression with supported operators).
+- When `current_time` returns an ISO-8601 timestamp, include that exact value
+  in your answer (do not rewrite it as a casual date/time phrase).
+- When the user asks for an exact decimal, give the full calculator result
+  without rounding or words like "approximately".
+- Reply with plain numbers and text, not LaTeX math notation.
+"""
 
 
 @tool
@@ -27,11 +40,10 @@ def calculator(expression: str) -> str:
     Only +, -, *, /, parentheses, and decimal numbers are accepted.
     Returns the numeric result as a string, or an error message if invalid.
     """
-    allowed = set("0123456789.+-*/() ")
-    if not expression or not set(expression) <= allowed:
+    if not expression or not set(expression) <= ALLOWED_CALC_CHARS:
         return f"error: expression contains unsupported characters: {expression!r}"
     if "**" in expression:
-        return "error: exponentiation (**) is rejected to prevent DoS via large numbers"
+        return "error: exponentiation (**) is rejected — use * or break the problem into steps"
     try:
         result = eval(expression, {"__builtins__": {}}, {})  # noqa: S307
     except Exception as exc:  # pylint: disable=broad-except
@@ -47,36 +59,33 @@ def current_time(timezone_name: str = "UTC") -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-SYSTEM_PROMPT = """You are a helpful assistant with access to tools.
-- Use `calculator` for any arithmetic, even simple sums.
-- Use `current_time` whenever the user asks about time or dates.
-- If a tool errors, explain the error to the user instead of retrying blindly.
-"""
+def message_to_text(message: object) -> str:
+    if not isinstance(message, dict):
+        return str(message)
+    parts = message.get("content", [])
+    text = " ".join(p.get("text", "") for p in parts if isinstance(p, dict))
+    return text or str(message)
 
-model = OpenAIModel(
-    client_args={"api_key": os.getenv("OPENAI_API_KEY")},
-    model_id=DEFAULT_MODEL,
-)
 
 agent = Agent(
-    name="honeyhive-skills-strands",
-    model=model,
+    name="honeyhive-skills-strands-no-honeyhive",
+    model=OpenAIModel(
+        client_args={"api_key": os.getenv("OPENAI_API_KEY")},
+        model_id=DEFAULT_MODEL,
+    ),
     tools=[calculator, current_time],
     system_prompt=SYSTEM_PROMPT,
     callback_handler=None,
 )
 
 
+def run_agent(prompt: str) -> str:
+    return message_to_text(agent(prompt).message)
+
+
 def main() -> None:
     prompt = " ".join(sys.argv[1:]).strip() or "What is 17 * 23?"
-    result = agent(prompt)
-    msg = result.message
-    if isinstance(msg, dict):
-        parts = msg.get("content", [])
-        text = " ".join(p.get("text", "") for p in parts if isinstance(p, dict))
-        print(text or msg)
-    else:
-        print(msg)
+    print(run_agent(prompt))
 
 
 if __name__ == "__main__":
