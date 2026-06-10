@@ -6,6 +6,12 @@ Integration examples for AI observability and evaluation with HoneyHive.
 
 ## Available Cookbooks
 
+### Evaluation & Policy-as-Code
+
+| Cookbook | Description |
+|----------|-------------|
+| [policy-as-code](./policy-as-code) | Codify AI agent behavior policies as executable evaluators following Microsoft's ASSERT framework |
+
 ### Multi-Agent Systems
 
 | Cookbook | Description |
