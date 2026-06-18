@@ -27,7 +27,9 @@
     "overrides": {
       "@tootallnate/once": "^2.0.1",
       "axios": "^1.15.2",
-      "tar": "^7.5.11",
+      "esbuild": "^0.28.1",
+      "form-data": "^4.0.6",
+      "tar": "^7.5.16",
       "undici": "^6.24.0"
     }
   }
