@@ -6,6 +6,12 @@ Integration examples for AI observability and evaluation with HoneyHive.
 
 ## Available Cookbooks
 
+### Evaluation & Policy-as-Code
+
+| Cookbook | Description |
+|----------|-------------|
+| [policy-as-code](./policy-as-code) | Define agent behavior policies in ASSERT YAML, auto-generate test cases, and score with HoneyHive |
+
 ### Multi-Agent Systems
 
 | Cookbook | Description |
