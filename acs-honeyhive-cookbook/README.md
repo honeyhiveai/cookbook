@@ -66,6 +66,29 @@ production those come from `classifier` annotator *endpoints*; here a small
 **offline annotator dispatcher** (`bank_agent/annotators.py`) returns
 deterministic classifier values so all 8 points fire with **zero network calls**.
 
+## How this shows up in HoneyHive
+
+[HoneyHive](https://docs.honeyhive.ai/) is the observability layer. Your code's
+LLM and tool calls are captured as **spans** (via OpenInference/OTLP) and grouped
+into a **session** — one trace for the whole agent run. This cookbook adds one
+more kind of span: **every ACS decision becomes its own span in that same
+session**, sitting right next to the model/tool call that triggered it.
+
+Each governance span is fully **queryable**, so policy enforcement becomes data
+you can filter and aggregate in the dashboard, not just a log line:
+
+- **metadata** — `acs.decision`, `acs.intervention_point`, `acs.reason`, `acs.message`
+- **metrics** — `acs_denied`, `acs_escalated`, `acs_transformed`, … (1/0 counters)
+- **outputs** — the `decision` and the `transformed_policy_target` (e.g. the redacted text)
+
+So in the HoneyHive UI (**Traces → Sessions**, filter by `source`) you can open
+one session and read the full story top-to-bottom: the model proposes a $25k
+wire, ACS `escalate`s it, the wire is blocked, and the account number is redacted
+from the final answer — each step a span you can click into. You can also slice
+across runs ("show every `escalate`", "count `deny` by intervention point") using
+the metadata/metrics above. See [The bridge](#the-bridge) for how those fields are
+attached.
+
 ## Layout
 
 ```

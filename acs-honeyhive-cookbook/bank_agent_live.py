@@ -175,16 +175,28 @@ async def guarded_model_response(control: AgentControl, message: dict[str, Any])
     await control.enforce(InterventionPoint.POST_MODEL_CALL, result, EnforcementMode.ENFORCE)
 
 
-def _message_to_dict(message: Any) -> dict[str, Any]:
-    payload: dict[str, Any] = {"role": message.role, "content": message.content or ""}
-    if message.tool_calls:
+def _message_for_acs(assistant: Any) -> dict[str, Any]:
+    """Shape the model reply the way the bank_agent post_model_call rule reads it."""
+    payload: dict[str, Any] = {"role": assistant.role, "content": assistant.content or ""}
+    if assistant.tool_calls:
+        payload["tool_calls"] = [
+            {"id": tc.id, "name": tc.function.name, "args": json.loads(tc.function.arguments or "{}")}
+            for tc in assistant.tool_calls
+        ]
+    return payload
+
+
+def _message_for_openai(assistant: Any) -> dict[str, Any]:
+    """Re-serialize the model reply into OpenAI wire format for the next turn."""
+    payload: dict[str, Any] = {"role": "assistant", "content": assistant.content or ""}
+    if assistant.tool_calls:
         payload["tool_calls"] = [
             {
                 "id": tc.id,
-                "name": tc.function.name,
-                "args": json.loads(tc.function.arguments or "{}"),
+                "type": "function",
+                "function": {"name": tc.function.name, "arguments": tc.function.arguments},
             }
-            for tc in message.tool_calls
+            for tc in assistant.tool_calls
         ]
     return payload
 
@@ -215,24 +227,16 @@ async def run_live_agent(control: AgentControl, client: AsyncOpenAI, user_text: 
             model=model, messages=effective_messages, tools=TOOL_SCHEMAS, max_tokens=400
         )
         assistant = response.choices[0].message
-        assistant_dict = _message_to_dict(assistant)
-        print(f"  [model turn {turn + 1}] tool_calls={[tc['name'] for tc in assistant_dict.get('tool_calls', [])] or 'none'}")
+        tool_names = [tc.function.name for tc in assistant.tool_calls or []]
+        print(f"  [model turn {turn + 1}] tool_calls={tool_names or 'none'}")
 
         try:
-            await guarded_model_response(control, assistant_dict)
+            await guarded_model_response(control, _message_for_acs(assistant))
         except AgentControlBlocked as blocked:
             print(f"  [post_model_call] DENY: {blocked.result.verdict.message}")
             return f"Model response blocked: {blocked.result.verdict.message}"
 
-        messages.append({k: v for k, v in {
-            "role": "assistant",
-            "content": assistant.content,
-            "tool_calls": assistant.tool_calls and [
-                {"id": tc.id, "type": "function",
-                 "function": {"name": tc.function.name, "arguments": tc.function.arguments}}
-                for tc in assistant.tool_calls
-            ],
-        }.items() if v is not None})
+        messages.append(_message_for_openai(assistant))
 
         if not assistant.tool_calls:
             final_text = assistant.content or ""
