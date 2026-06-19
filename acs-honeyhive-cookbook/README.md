@@ -26,10 +26,27 @@ agent trace. HoneyHive is a listed ACS partner.
 
 ## What this cookbook runs
 
-It drives Microsoft's **official `bank_agent` example** (its real Rego policy and
-manifest, banking domain) through all 8 ACS intervention points against the
-**real ACS runtime** (`AgentControl.from_path(...)` + OPA), not the bundled
-stdlib mock demo. Each evaluation is captured as a HoneyHive span.
+It governs an agent with Microsoft's **official `bank_agent` policy** (its real
+Rego + manifest, banking domain) against the **real ACS runtime**
+(`AgentControl.from_path(...)` + OPA — not the bundled stdlib mock demo), and
+captures each evaluation as a HoneyHive span. There are two runners:
+
+| Runner | What it is | Best for |
+|--------|------------|----------|
+| `bank_agent_live.py` | A **real** `AsyncOpenAI` tool-calling banking agent (multiple model turns + real `lookup_account` / `wire_transfer` tools), mediated by ACS via the SDK's `run` / `run_tool` orchestration helpers. | The **lifelike** view — a working agent with ACS `allow` / `transform` / `escalate` decisions appearing inline next to its real `ChatCompletion` and tool spans. |
+| `bank_agent_runner.py` | A deterministic replay that feeds one host snapshot per intervention point. | **Full decision coverage** — guarantees all 5 decision types (`allow`/`deny`/`escalate`/`transform`/`warn`) across all 8 points in a single run. |
+
+> Why two? Microsoft ships `bank_agent` as policy + manifest + `snapshots/*.json`
+> + a *mock* demo — there is no runnable agent loop upstream. `bank_agent_live.py`
+> supplies a genuine agent so you see organic governance; `bank_agent_runner.py`
+> deterministically exercises every branch (a live LLM won't reliably produce a
+> `deny` on demand). Both use the identical Rego policy and the same
+> `instrument_acs` bridge.
+
+The decision-coverage table below describes every branch the policy can take;
+`bank_agent_runner.py` exercises all of them, and `bank_agent_live.py` exercises
+whichever ones the live agent's behavior triggers (typically `allow`,
+`transform`, and `escalate`).
 
 ### Decision coverage (verified end to end)
 
@@ -54,7 +71,8 @@ deterministic classifier values so all 8 points fire with **zero network calls**
 ```
 acs-honeyhive-cookbook/
 ├── acs_honeyhive.py        # the bridge: instrument_acs() + manual make_acs_guard()
-├── bank_agent_runner.py    # drives the bank_agent through all 8 ACS points
+├── bank_agent_live.py      # REAL OpenAI tool-calling agent governed by ACS (lifelike trace)
+├── bank_agent_runner.py    # deterministic replay through all 8 ACS points (full coverage)
 ├── verify_honeyhive.py     # queries the HoneyHive events API and asserts coverage
 ├── minimal_smoke.py        # zero-config sanity check (manual wrapper)
 ├── bank_agent/
@@ -112,7 +130,7 @@ Copy `.env.example` to `.env` and fill it in (or export the variables):
 
 ```bash
 HH_API_KEY=...              # HoneyHive
-OPENAI_API_KEY=...          # optional
+OPENAI_API_KEY=...          # required for bank_agent_live.py; optional for the others
 ACS_OPA_PATH=/abs/path/opa  # required for Rego
 # HH_API_URL=...            # optional, non-default region
 # HH_PROJECT=...            # optional, for the verification query
@@ -124,14 +142,44 @@ ACS_OPA_PATH=/abs/path/opa  # required for Rego
 # 1) (optional) sanity-check ACS + OPA + HoneyHive wiring with the minimal policy
 python minimal_smoke.py
 
-# 2) govern the bank_agent through all 8 ACS points; emit a span per decision
+# 2a) LIFELIKE: a real OpenAI tool-calling banking agent under ACS governance
+python bank_agent_live.py
+
+# 2b) DETERMINISTIC: drive all 8 ACS points so every decision type appears
 python bank_agent_runner.py
 
 # 3) confirm the spans landed in HoneyHive
 python verify_honeyhive.py
 ```
 
-`bank_agent_runner.py` prints a per-point summary and reports the HoneyHive
+### The lifelike agent (`bank_agent_live.py`)
+
+A real `AsyncOpenAI` agent processes a transfer work order. It calls
+`lookup_account`, then attempts a `$25,000` `wire_transfer` — and ACS governs
+every boundary inline. A typical run produces one HoneyHive session like:
+
+```
+governed_bank_agent_live (chain)
+├─ acs.guard            input          allow
+├─ acs.pre_model_call   pre_model_call transform   (injects a high-value-transfer reminder)
+├─ ChatCompletion       (real model)   -> tool_call: lookup_account
+├─ acs.post_model_call  post_model_call allow
+├─ acs.guard            pre_tool_call  allow
+│  └─ (real lookup_account executes)
+├─ acs.guard            post_tool_call transform   (redacts account_id)
+├─ ChatCompletion       (real model)   -> tool_call: wire_transfer $25,000
+├─ acs.guard            pre_tool_call  escalate     -> approval denied, wire BLOCKED
+├─ ChatCompletion       (real model)   -> final answer
+└─ acs.guard            output         transform    (redacts CHK-xxxxx)
+```
+
+Because it is driven by a live LLM it is non-deterministic; the work-order
+framing makes the `wire_transfer` attempt (and thus the `escalate`) likely. Set
+`OPENAI_MODEL` to override the model (defaults to `gpt-4o`).
+
+### The deterministic runner (`bank_agent_runner.py`)
+
+Prints a per-point summary and reports the HoneyHive
 `source` and `session_name` so the trace is easy to find:
 
 ```
