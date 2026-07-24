@@ -7,7 +7,7 @@ import {
   type RunResultStatus,
   type SDKMessage,
 } from '@cursor/sdk';
-import { Client, type StartSessionResponse } from '@honeyhive/api-client';
+import { Client, type CreateSessionResponse } from '@honeyhive/api-client';
 
 import { createClientConfig } from './config.js';
 import { createAgentEvent, createFinalEvent, createToolEvent } from './events.js';
@@ -208,9 +208,9 @@ export class HoneyHiveCursorInstrumentor {
       childrenIds: [agentEventId],
       conversationSummary,
     });
-    await this.#client.sessions.addTraces({
-      path: { session_id: sessionId },
-      body: { logs: exportedEvents },
+    await this.#client.sessions.createEventBatch({
+      session_id: sessionId,
+      events: exportedEvents,
     });
 
     return {
@@ -236,34 +236,30 @@ export class HoneyHiveCursorInstrumentor {
     endTime: number;
     childrenIds: string[];
     conversationSummary?: CursorConversationSummary;
-  }): Promise<StartSessionResponse> {
-    return this.#client.sessions.start({
-      body: {
-        session: {
-          session_id: options.sessionId,
-          session_name: options.sessionName,
-          event_name: 'session.start',
-          source: this.#source,
-          start_time: options.startTime,
-          end_time: options.endTime,
-          duration: options.endTime - options.startTime,
-          inputs: compactObject({
-            prompt: options.prompt,
-            workspace: this.#sanitize(options.cwd, 'workspace'),
-          }),
-          outputs: compactObject({
-            status: options.status,
-            result: this.#sanitize(options.result, 'result'),
-          }),
-          metadata: compactObject({
-            project: this.#project,
-            error: options.error,
-            sdk: 'cursor',
-            conversation: options.conversationSummary,
-          }),
-          children_ids: options.childrenIds,
-        },
-      },
+  }): Promise<CreateSessionResponse> {
+    return this.#client.sessions.create({
+      session_id: options.sessionId,
+      session_name: options.sessionName,
+      event_name: 'session.start',
+      source: this.#source,
+      start_time: options.startTime,
+      end_time: options.endTime,
+      duration: options.endTime - options.startTime,
+      inputs: compactObject({
+        prompt: options.prompt,
+        workspace: this.#sanitize(options.cwd, 'workspace'),
+      }),
+      outputs: compactObject({
+        status: options.status,
+        result: this.#sanitize(options.result, 'result'),
+      }),
+      metadata: compactObject({
+        project: this.#project,
+        error: options.error,
+        sdk: 'cursor',
+        conversation: options.conversationSummary,
+      }),
+      children_ids: options.childrenIds,
     });
   }
 
