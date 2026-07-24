@@ -8,9 +8,9 @@ import {
   type SDKUserMessage,
   type SendOptions,
 } from '@cursor/sdk';
-import { type AddSessionTracesRequest } from '@honeyhive/api-client';
+import { type CreateSessionEventBatchRequest } from '@honeyhive/api-client';
 
-export type HoneyHiveTraceEvent = AddSessionTracesRequest['logs'][number];
+export type HoneyHiveTraceEvent = CreateSessionEventBatchRequest['events'][number];
 export type CursorRunGit = RunResult['git'];
 export type SanitizeContext =
   | 'prompt'

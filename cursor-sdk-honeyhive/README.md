@@ -95,7 +95,7 @@ const result = await instrumentor.traceRun({
 });
 ```
 
-`traceRun` composes Cursor SDK `onDelta`, `onStep`, `run.stream()`, `run.wait()`, and `run.conversation()` to capture tool calls, stream status, token usage, step timing, and final run metadata. It then exports the trace through `@honeyhive/api-client`'s `sessions.start` and `sessions.addTraces` APIs.
+`traceRun` composes Cursor SDK `onDelta`, `onStep`, `run.stream()`, `run.wait()`, and `run.conversation()` to capture tool calls, stream status, token usage, step timing, and final run metadata. It then exports the trace through `@honeyhive/api-client`'s `sessions.create` and `sessions.createEventBatch` APIs.
 
 ### Customizing what gets sent
 
