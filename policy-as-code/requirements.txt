@@ -1,0 +1,4 @@
+honeyhive>=1.0.0
+anthropic
+assert-ai
+python-dotenv
