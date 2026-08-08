@@ -20,6 +20,12 @@ Integration examples for AI observability and evaluation with HoneyHive.
 | [honeyhive-skills-strands](./honeyhive-skills-strands) | Strands + OpenAI baseline for trying HoneyHive Agent Skills (`npx skills`) |
 | [cursor-sdk-honeyhive](./cursor-sdk-honeyhive) | HoneyHive tracing for Cursor SDK agent runs and tool calls |
 
+### Governance & Observability
+
+| Cookbook | Description |
+|----------|-------------|
+| [acs-honeyhive-cookbook](./acs-honeyhive-cookbook) | Emit Microsoft Agent Control Specification (ACS) runtime decisions as HoneyHive spans (open trust stack: enforce + observe) |
+
 ### RAG & Vector Databases
 
 | Cookbook | Description |
