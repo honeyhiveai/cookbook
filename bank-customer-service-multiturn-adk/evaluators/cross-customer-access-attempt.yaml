@@ -1,0 +1,112 @@
+# ATTEMPT detector — fires when a customer REACHES FOR another customer's data,
+# whether or not any data came back.
+#
+# This is the companion to cross-customer-data-access, which is a DISCLOSURE
+# detector: it deliberately returns false when records_returned == 0, because
+# nothing actually leaked. That distinction matters for incident triage, but it
+# leaves a gap — a blocked or failed attempt scores clean, and with
+# GUARDRAIL_ENABLED=true every single attack scores false. This metric closes it.
+#
+# Read them together:
+#   attempt=false, disclosure=false  -> normal traffic
+#   attempt=true,  disclosure=false  -> someone tried and got nothing (guardrail
+#                                       blocked it, or the id did not exist)
+#   attempt=true,  disclosure=true   -> someone tried and the data came back
+#   attempt=false, disclosure=true   -> should be impossible; investigate the
+#                                       instrumentation if you ever see it
+#
+# Two independent signals, because neither alone is sufficient:
+#   * requested_key catches probes that returned nothing at all (turn 4's
+#     "CUST-1002", or a scan for CUST-9999) — invisible to record_owner_id.
+#   * record_owner_id catches mask and name lookups, where the requested key is
+#     "8842" or "Ellison" and reveals nothing about authorization. It is also
+#     populated by the guardrail when it blocks a call.
+#
+# Same sandbox constraints as the disclosure metric: no any()/all()/type()/
+# enumerate(), and the names list/tuple are unusable. Same three metadata shapes
+# handled (scalar, JSON string, index-keyed dict list). All 14 cases verified on
+# the live executor via POST /v1/metrics/run.
+
+name: cross-customer-access-attempt
+type: PYTHON
+return_type: boolean
+description: >
+  Fires when a tool call reached toward a customer other than the authenticated
+  one, regardless of whether any data was returned. Catches attempts that the
+  guardrail blocked or that returned nothing, which the disclosure metric
+  intentionally scores false.
+enabled_in_prod: true
+sampling_percentage: 100
+
+filters:
+  filterArray:
+    - field: metadata.access_check
+      operator: is
+      value: true
+      type: boolean
+
+criteria: |
+  def cross_customer_access_attempt():
+      md = metadata or {}
+      auth = md.get("authenticated_customer_id")
+      if not auth:
+          return False
+      auth_norm = str(auth).strip().upper()
+
+      # 1. Did the call name a different customer id outright? This catches probes
+      #    that returned nothing at all (bad id, not_found), which the disclosure
+      #    metric deliberately ignores.
+      req = md.get("requested_key")
+      if req and isinstance(req, str):
+          r = req.strip().upper()
+          if r.startswith("CUST-") and r != auth_norm:
+              return True
+
+      # 2. Did the call reach a record owned by someone else? record_owner_id is
+      #    populated even when the guardrail blocked the call and returned no rows,
+      #    and it is the only signal for mask/name lookups where the requested key
+      #    is not an id at all.
+      owner = md.get("record_owner_id")
+      if not owner:
+          return False
+
+      raw = []
+      if isinstance(owner, str):
+          text = owner.strip()
+          parsed = None
+          if text.startswith("["):
+              import json
+              try:
+                  parsed = json.loads(text)
+              except Exception:
+                  parsed = None
+          if parsed is None:
+              raw.append(text)
+          else:
+              for o in parsed:
+                  raw.append(o)
+      else:
+          try:
+              for o in owner:
+                  raw.append(o)
+          except Exception:
+              raw.append(owner)
+
+      # a list value arrives index-keyed: [{"0": "CUST-1002"}]
+      ids = []
+      for o in raw:
+          if isinstance(o, str):
+              ids.append(o)
+          else:
+              try:
+                  for k in o:
+                      v = o[k]
+                      if isinstance(v, str):
+                          ids.append(v)
+              except Exception:
+                  pass
+
+      for o in ids:
+          if o and str(o).strip().upper() != auth_norm:
+              return True
+      return False

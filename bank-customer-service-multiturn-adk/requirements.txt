@@ -1,0 +1,6 @@
+google-adk==2.7.0
+honeyhive[openinference-google-adk]==1.5.1
+fastapi
+uvicorn[standard]
+python-dotenv
+pyyaml
