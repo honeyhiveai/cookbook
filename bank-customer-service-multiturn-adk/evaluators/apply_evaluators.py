@@ -1,9 +1,17 @@
 """Create/update the online evaluators from the YAML files in evaluators/.
 
-The spec's `honeyhive metrics create` CLI path does not exist in honeyhive 1.5.1
-— the shipped CLI has no `metrics` command and registers no console script — so
-this posts to the REST API instead. `filters` IS accepted there (verified against
-the generated CreateMetricRequest model).
+Each evaluator is a pair of files:
+
+    <name>.json    config: name, type, filters, sampling, return_type
+    <name>.py      the evaluator function  (PYTHON metrics)
+    <name>.prompt  the prompt template     (LLM metrics)
+
+evaluators/loader.py assembles them into the JSON payload the API expects, and
+validates the code against the evaluator sandbox first — a sandbox failure is
+silent per-span, so catching it here is the difference between an error and a
+metric that quietly never scores.
+
+There is no CLI path for this: honeyhive 1.5.1 ships no `metrics` command.
 
     python evaluators/apply_evaluators.py            # create/update both
     python evaluators/apply_evaluators.py --dry-run  # print payloads only
@@ -17,10 +25,10 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-import yaml
 from dotenv import load_dotenv
 
-EVAL_DIR = Path(__file__).resolve().parent
+from loader import EvaluatorError, load_all
+
 DEFAULT_BASE = "https://api.dp1.us.honeyhive.ai"
 
 
@@ -50,9 +58,13 @@ def main() -> int:
         print("HH_API_KEY is not set.", file=sys.stderr)
         return 2
 
-    files = sorted(EVAL_DIR.glob("*.yaml"))
-    if not files:
-        print(f"No evaluator YAML found in {EVAL_DIR}", file=sys.stderr)
+    try:
+        evaluators = load_all()
+    except EvaluatorError as exc:
+        print(f"\nEvaluator rejected before upload:\n  {exc}\n", file=sys.stderr)
+        return 1
+    if not evaluators:
+        print("No evaluator .json config found", file=sys.stderr)
         return 1
 
     existing = {}
@@ -68,14 +80,8 @@ def main() -> int:
                   f"will attempt creates", file=sys.stderr)
 
     rc = 0
-    for path in files:
-        spec = yaml.safe_load(path.read_text())
+    for path, spec in evaluators:
         name = spec["name"]
-
-        if spec.get("sampling_percentage") != 100:
-            print(f"  ! {name}: sampling_percentage is "
-                  f"{spec.get('sampling_percentage')}, expected 100")
-
         print(f"\n=== {name} ({path.name}) ===")
         if args.dry_run:
             print(json.dumps(spec, indent=2)[:1500])
@@ -112,8 +118,8 @@ def main() -> int:
         live = body if isinstance(body, list) else (body or {}).get("metrics", [])
         by_name = {m.get("name"): m for m in live}
         print("\n=== confirmed live in project ===")
-        for path in files:
-            name = yaml.safe_load(path.read_text())["name"]
+        for _path, spec in evaluators:
+            name = spec["name"]
             m = by_name.get(name)
             if not m:
                 rc = 1

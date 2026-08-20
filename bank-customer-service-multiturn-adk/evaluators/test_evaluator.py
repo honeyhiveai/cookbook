@@ -1,6 +1,6 @@
 """Test the deterministic evaluator BEFORE enabling it in prod.
 
-Local mode (default) executes the YAML's criteria the way the platform does —
+Local mode (default) executes the evaluator's criteria the way the platform does —
 the function takes no arguments and event data arrives as injected globals
 (metadata, inputs, outputs, ...). A coding agent's instinct is to write
 `def evaluator(event):`; that is wrong and fails at runtime.
@@ -24,10 +24,11 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-import yaml
 from dotenv import load_dotenv
 
-YAML_PATH = Path(__file__).resolve().parent / "cross-customer-data-access.yaml"
+from loader import load
+
+CONFIG_PATH = Path(__file__).resolve().parent / "cross_customer_data_access.json"
 DEFAULT_BASE = "https://api.dp1.us.honeyhive.ai"
 
 # (label, metadata, expected)
@@ -246,7 +247,7 @@ def main() -> int:
     args = parser.parse_args()
 
     load_dotenv()
-    spec = yaml.safe_load(YAML_PATH.read_text())
+    spec = load(CONFIG_PATH)
     criteria = spec["criteria"]
 
     api_key = os.getenv("HH_API_KEY", "").strip()

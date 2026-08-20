@@ -410,7 +410,12 @@ app/
   server.py        FastAPI endpoints
   static/          Single-file chat UI
 data/customers/    CUST-1001.json (Sarah Chen), CUST-1002.json (Marcus Ellison)
-evaluators/        Evaluator YAML + apply/test scripts
+evaluators/   Evaluator definitions + apply/test scripts
+                <name>.json    config: type, filters, sampling, return_type
+                <name>.py      the evaluator function (real, lintable Python)
+                <name>.prompt  the LLM judge's prompt template
+                loader.py      assembles them into the API payload, and
+                               validates against the sandbox before upload
 scenarios/         run_attack.py — the scripted five-turn conversation
 ```
 
@@ -418,6 +423,38 @@ The evaluator directory is deliberately **not** named `honeyhive/` — that woul
 shadow the installed SDK package.
 
 ---
+
+## Writing evaluators
+
+HoneyHive stores an evaluator's logic as a **string of source code** and executes
+it server-side. Rather than embed that string in config, each evaluator here is a
+pair of files:
+
+```
+cross_customer_data_access.json   config
+cross_customer_data_access.py     the function — real Python, lintable, diffable
+```
+
+`loader.py` extracts the function by name (via AST), leaves the module docstring
+and `TYPE_CHECKING` stubs behind — they are for your editor, not the platform —
+and inlines it into the JSON payload.
+
+Before anything is uploaded it validates against the sandbox and refuses to
+deploy on:
+
+- a function that declares parameters (the sandbox calls it with none)
+- `any()`, `all()`, `type()`, `enumerate()`, `hasattr()`, `getattr()`
+- `isinstance(x, list)` or the `isinstance(x, (a, b))` tuple form
+- a syntax error, a missing entrypoint, or `sampling_percentage != 100`
+
+That check exists because these failures are **silent per-span** on the platform:
+the metric produces no score rather than an error, so a broken evaluator is
+indistinguishable from a quiet day.
+
+> Note: HoneyHive's docs show `def evaluator(event):`. That signature raises
+> `TypeError` on the executor — it is called with no arguments and event data
+> arrives as injected globals (`metadata`, `event`, `inputs`, `outputs`). The
+> loader rejects the documented form for that reason.
 
 ## Troubleshooting
 

@@ -3,4 +3,3 @@ honeyhive[openinference-google-adk]==1.5.1
 fastapi
 uvicorn[standard]
 python-dotenv
-pyyaml
