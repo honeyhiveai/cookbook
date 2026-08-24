@@ -4,10 +4,3 @@ poller.env
 __pycache__/
 *.pyc
 .venv/
-ids.txt
-ids.dedup.txt
-ids.done.txt
-ids.remaining.txt
-ids.next.txt
-ids.exported.txt
-agentforce-repin.log
