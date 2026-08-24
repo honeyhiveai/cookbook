@@ -210,7 +210,7 @@ The unknown-session exit is `Unknown session ID, or the session is past the 72-h
 
 ## Recovering a half-finished install
 
-[`install.sh`](./install.sh) copies the script, `poller.env`, and the state file into `/srv/agentforce`, then deletes the relative leftovers in the current directory.
+[`install.sh`](./install.sh) copies the poller modules, `poller.env`, and the state file into `/srv/agentforce`, then deletes the relative leftovers in the current directory.
 
 - If you pinned and the state file is missing on the host, copy it after the script finishes and `sudo install -o agentforce -m 0644` it to the dest. Without it the first supervised pass re-exports that conversation.
 - A failed `install` leaves the files in the current directory. Fix the cause and re-run.
@@ -218,7 +218,7 @@ The unknown-session exit is `Unknown session ID, or the session is past the 72-h
 ```bash
 { [ ! -e poll_agentforce.py ] && [ ! -e poller.env ]; } \
   && echo "clean: no leftover script or env file here" \
-  || echo "leftovers: poll_agentforce.py or poller.env is still in this directory"
+  || echo "leftovers: poller modules or poller.env is still in this directory"
 env | grep -q '^HH_API_KEY=' \
   && echo "sourced exports still set in this shell; unset HH_API_KEY HH_API_URL SALESFORCE_INSTANCE_URL SALESFORCE_CLIENT_ID SALESFORCE_CLIENT_SECRET EXPORTED_FILE" \
   || echo "clean: HH_API_KEY is not exported in this shell"

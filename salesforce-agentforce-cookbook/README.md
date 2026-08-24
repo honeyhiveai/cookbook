@@ -103,7 +103,7 @@ Downtime longer than Salesforce's 72-hour export window loses those conversation
 
 ### systemd
 
-`./install.sh` creates `/srv/agentforce` and the `agentforce` user, then moves `poll_agentforce.py`, `poller.env`, and the state file there. Run it from this directory after the pin.
+`./install.sh` creates `/srv/agentforce` and the `agentforce` user, then moves the poller modules, `poller.env`, and the state file there. Run it from this directory after the pin.
 
 ```bash
 chmod +x install.sh
@@ -201,7 +201,11 @@ Event types: `chain` for turns, `model` for LLM / router / classifier / guardrai
 
 | File | Purpose |
 | --- | --- |
-| [`poll_agentforce.py`](./poll_agentforce.py) | Discover sessions, map spans, POST OTLP |
+| [`poll_agentforce.py`](./poll_agentforce.py) | Entrypoint: pin and discovery loops, POST OTLP |
+| [`otel_map.py`](./otel_map.py) | HoneyHive session stamps and span mapping |
+| [`policy.py`](./policy.py) | Idle bound, 72-hour window, skip/reject decisions |
+| [`state.py`](./state.py) | Exported/rejected ledger |
+| [`config.py`](./config.py) [`net.py`](./net.py) [`salesforce_api.py`](./salesforce_api.py) | Settings, HTTP, Salesforce calls |
 | [`poller.env.example`](./poller.env.example) | Copy to `poller.env` |
 | [`install.sh`](./install.sh) | Move the poller onto `/srv/agentforce` |
 | [`repin.sh`](./repin.sh) | Bulk-pin after a wrong-project pass |

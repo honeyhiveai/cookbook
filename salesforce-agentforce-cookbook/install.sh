@@ -80,7 +80,9 @@ id -u agentforce >/dev/null 2>&1 || sudo useradd --system --home /srv/agentforce
 sudo mkdir -p /srv/agentforce
 sudo chmod 750 /srv/agentforce
 sudo chown agentforce /srv/agentforce
-sudo install -o agentforce -m 0644 poll_agentforce.py /srv/agentforce/poll_agentforce.py
+for module in poll_agentforce.py config.py net.py otel_map.py policy.py salesforce_api.py state.py; do
+  sudo install -o agentforce -m 0644 "$module" "/srv/agentforce/$module"
+done
 sudo install -o agentforce -m 0600 poller.env /srv/agentforce/poller.env
 if [ "$exported_file" = "$dest" ]; then
   if sudo test -d "$dest_dir"; then
@@ -101,7 +103,7 @@ else
   sudo install -d -o agentforce -m 0750 "$dest_dir"
   sudo install -o agentforce -m 0644 "$exported_file" "$dest"
 fi
-rm -f poll_agentforce.py poller.env
+rm -f poll_agentforce.py config.py net.py otel_map.py policy.py salesforce_api.py state.py poller.env
 case "$exported_file" in
   /*) ;;
   *) rm -f "$exported_file" ;;
