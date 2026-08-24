@@ -19,6 +19,7 @@ Integration examples for AI observability and evaluation with HoneyHive.
 |----------|-------------|
 | [honeyhive-skills-strands](./honeyhive-skills-strands) | Strands + OpenAI baseline for trying HoneyHive Agent Skills (`npx skills`) |
 | [cursor-sdk-honeyhive](./cursor-sdk-honeyhive) | HoneyHive tracing for Cursor SDK agent runs and tool calls |
+| [salesforce-agentforce-cookbook](./salesforce-agentforce-cookbook) | Poll Salesforce Agentforce Session Trace OTel and forward each conversation as one HoneyHive session |
 
 ### RAG & Vector Databases
 

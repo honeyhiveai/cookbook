@@ -1,0 +1,13 @@
+poller.env
+.agentforce-exported.json
+.agentforce-exported.json.tmp
+__pycache__/
+*.pyc
+.venv/
+ids.txt
+ids.dedup.txt
+ids.done.txt
+ids.remaining.txt
+ids.next.txt
+ids.exported.txt
+agentforce-repin.log
