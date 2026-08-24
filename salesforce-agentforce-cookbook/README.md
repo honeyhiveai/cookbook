@@ -2,7 +2,7 @@
 
 Poll [Salesforce Agentforce](https://www.salesforce.com/agentforce/) [Session Trace OTel](https://developer.salesforce.com/docs/ai/agentforce/guide/otel-api.html) and forward each conversation as one HoneyHive session.
 
-Agentforce does not push OpenTelemetry to an external endpoint. This cookbook is a stdlib-only poller you own and adapt. Salesforce setup is below. Skip lines, the state file, and recovery are in [If something looks wrong](#if-something-looks-wrong).
+Agentforce does not push OpenTelemetry to an external endpoint. This cookbook is a beta reference poller (Python standard library only). Salesforce setup is below. Skip lines, the state file, and recovery are in [If something looks wrong](#if-something-looks-wrong).
 
 One Agentforce conversation becomes one HoneyHive session with turn, model, and tool events.
 
