@@ -174,28 +174,14 @@ Leave `MAX_PASSES` unset (default `0`) to loop until you interrupt. For cron or 
 | `SALESFORCE_SESSION_ID` | No | Export this session only. Pass inline |
 | `HONEYHIVE_SESSION_ID` | No | HoneyHive session UUID for a pin. Pass inline |
 | `HONEYHIVE_SESSION_NAME` | No | Sessions-tab row name for a pin. Pass inline |
-| `DISCOVERY_WINDOW_DAYS` | No | SOQL `LAST_N_DAYS` bound (default `4`) |
+| `DISCOVERY_WINDOW_DAYS` | No | How many calendar days of sessions to discover (default `4`) |
 | `DISCOVERY_LIMIT` | No | Maximum sessions per discovery pass (default `20`) |
 | `SESSION_IDLE_SECONDS` | No | Idle bound in seconds (default `120`) |
 | `EXPORTED_FILE` | No | JSON file of exported and rejected IDs (default `.agentforce-exported.json`) |
 
 Empty or whitespace-only values for the optional integers and `EXPORTED_FILE` use the default. A value that is not a whole number exits 1. `POLL_INTERVAL`, `DISCOVERY_LIMIT`, and `SESSION_IDLE_SECONDS` clamp values below `1` to `1`. `MAX_PASSES` and `DISCOVERY_WINDOW_DAYS` clamp a negative to `0`.
 
-## What HoneyHive receives
-
-The poller stamps `honeyhive.session_id`, `honeyhive.session_auto_create`, and `honeyhive.session_name` on the resource and every span, then POSTs to `{HH_API_URL}/opentelemetry/v1/traces`. It does not call `POST /v1/sessions`.
-
-Session ID mapping:
-
-```python
-def honeyhive_session_id(sf_session_id: str) -> str:
-    try:
-        return str(uuid.UUID(sf_session_id))
-    except ValueError:
-        return str(uuid.uuid5(uuid.NAMESPACE_URL, f"agentforce:{sf_session_id}"))
-```
-
-Event types: `chain` for turns, `model` for LLM / router / classifier / guardrail steps, `tool` for state updates. Mapping details, leftover `input.value` / `output.value` buckets, and the sample tree are in the [how-to](https://docs.honeyhive.ai/v2/integrations/salesforce-agentforce#what-honeyhive-receives).
+What HoneyHive stores for each conversation is in the [how-to](https://docs.honeyhive.ai/v2/integrations/salesforce-agentforce#what-honeyhive-receives).
 
 ## Files
 
@@ -208,7 +194,6 @@ Event types: `chain` for turns, `model` for LLM / router / classifier / guardrai
 | [`config.py`](./config.py) [`net.py`](./net.py) [`salesforce_api.py`](./salesforce_api.py) | Settings, HTTP, Salesforce calls |
 | [`poller.env.example`](./poller.env.example) | Copy to `poller.env` |
 | [`install.sh`](./install.sh) | Move the poller onto `/srv/agentforce` |
-| [`repin.sh`](./repin.sh) | Bulk-pin after a wrong-project pass |
 | [`OPERATING.md`](./OPERATING.md) | State file, skip lines, recovery |
 
 ## Links
