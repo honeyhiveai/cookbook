@@ -187,10 +187,10 @@ The unknown-session exit is `Unknown session ID, or the session is past the 72-h
 
 ## Recovering a half-finished install
 
-[`install.sh`](./install.sh) copies the poller, `poller.env`, and the state file into `/srv/agentforce`, then deletes the relative leftovers in the current directory.
+[`install.sh`](./install.sh) copies the poller modules, `poller.env`, and the state file into `/srv/agentforce`. It removes `poller.env` from this directory after the copy. The Python modules stay in the clone.
 
 - If you pinned and the state file is missing on the host, copy it after the script finishes. Without it the first supervised pass re-exports that conversation.
-- A failed `install` leaves the files in the current directory. Fix the cause and re-run.
+- A failed `install` leaves `poller.env` in this directory. Fix the cause and re-run.
 
 ## Empty or 404 session fetches
 

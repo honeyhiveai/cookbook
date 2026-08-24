@@ -103,7 +103,7 @@ else
   sudo install -d -o agentforce -m 0750 "$dest_dir"
   sudo install -o agentforce -m 0644 "$exported_file" "$dest"
 fi
-rm -f poll_agentforce.py config.py net.py otel_map.py policy.py salesforce_api.py state.py poller.env
+rm -f poller.env
 case "$exported_file" in
   /*) ;;
   *) rm -f "$exported_file" ;;

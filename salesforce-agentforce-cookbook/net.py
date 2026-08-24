@@ -18,6 +18,23 @@ class HttpFailure(Exception):
         self.body = body
 
 
+class StripAuthOnHostChangeRedirect(urllib.request.HTTPRedirectHandler):
+    """Drop Authorization when a redirect changes host."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        new = super().redirect_request(req, fp, code, msg, headers, newurl)
+        if new is None:
+            return None
+        old_host = urllib.parse.urlparse(req.full_url).netloc.lower()
+        new_host = urllib.parse.urlparse(new.full_url).netloc.lower()
+        if old_host != new_host:
+            new.remove_header("Authorization")
+        return new
+
+
+_OPENER = urllib.request.build_opener(StripAuthOnHostChangeRedirect)
+
+
 FETCH_ERRORS = (
     OSError,
     http.client.HTTPException,
@@ -51,7 +68,7 @@ def http_json(method: str, url: str, headers: dict, data=None, form: bool = Fals
             req_headers.setdefault("Content-Type", "application/json")
     request = urllib.request.Request(url, data=body, headers=req_headers, method=method)
     try:
-        with urllib.request.urlopen(request, timeout=120) as response:
+        with _OPENER.open(request, timeout=120) as response:
             raw = response.read()
             if not raw:
                 raise json.JSONDecodeError("empty response body", "", 0)
