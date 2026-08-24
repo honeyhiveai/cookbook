@@ -2,7 +2,7 @@
 
 Poll [Salesforce Agentforce](https://www.salesforce.com/agentforce/) [Session Trace OTel](https://developer.salesforce.com/docs/ai/agentforce/guide/otel-api.html) and forward each conversation as one HoneyHive session.
 
-Agentforce does not push OpenTelemetry to an external endpoint. This cookbook is a stdlib-only poller you own and adapt. Salesforce setup and the HoneyHive session mapping live in the [Agentforce how-to](https://docs.honeyhive.ai/v2/integrations/salesforce-agentforce). Day-to-day skip lines, the state file, and recovery live in [OPERATING.md](./OPERATING.md).
+Agentforce does not push OpenTelemetry to an external endpoint. This cookbook is a stdlib-only poller you own and adapt. Salesforce setup is below. Day-to-day skip lines, the state file, and recovery live in [OPERATING.md](./OPERATING.md).
 
 One Agentforce conversation becomes one HoneyHive session with turn, model, and tool events.
 
@@ -12,7 +12,7 @@ One Agentforce conversation becomes one HoneyHive session with turn, model, and 
 | --- | --- |
 | Python 3.10+ | Standard library only. No `pip` install |
 | Salesforce org with Agentforce and Data 360 | [Get Started with Agentforce](https://developer.salesforce.com/docs/ai/agentforce/guide/get-started.html) |
-| Agentforce Session Tracing plus an External Client App | Follow [Enable tracing](https://docs.honeyhive.ai/v2/integrations/salesforce-agentforce#enable-tracing-in-salesforce) and [Create an External Client App](https://docs.honeyhive.ai/v2/integrations/salesforce-agentforce#create-an-external-client-app) |
+| Agentforce Session Tracing plus an External Client App | Follow [Salesforce setup](#salesforce-setup) |
 | HoneyHive project API key | [Settings > Project > API Keys](https://app.us.honeyhive.ai/settings/project/keys) |
 | A host with persistent storage | Needed for `.agentforce-exported.json`. systemd steps below assume Linux with root |
 
@@ -36,6 +36,15 @@ SALESFORCE_CLIENT_SECRET=<eca-consumer-secret>
 ```
 
 `ls -l poller.env` should show `-rw-------`.
+
+## Salesforce setup
+
+Do this in the Salesforce org before you run the poller. Salesforce's [Session Trace OTel guide](https://developer.salesforce.com/docs/ai/agentforce/guide/otel-api.html) has the current steps.
+
+1. Turn on **Data 360**. Confirm a dataspace under **Setup > Einstein Audit, Analytics, and Monitoring Setup**.
+2. Turn on **Agentforce Session Tracing** and **Audit and Feedback**. Refresh `AiAgentSession`, `AiAgentInteraction`, `AiAgentInteractionMessage`, and `AiAgentInteractionStep` in **Data Cloud > Data Streams**.
+3. **Activate** (publish) the agent. Draft-only preview sessions often do not show up.
+4. Create an [External Client App](https://help.salesforce.com/s/articleView?id=sf.external_client_apps.htm) with the `api` scope and Client Credentials Flow. **Run As** needs Data Cloud access and Einstein Audit read access. Copy the consumer key, secret, and My Domain host (`https://<domain>.my.salesforce.com`).
 
 ## Preview
 
@@ -103,7 +112,7 @@ Downtime longer than Salesforce's 72-hour export window loses those conversation
 
 ### systemd
 
-`./install.sh` creates `/srv/agentforce` and the `agentforce` user, then moves the poller modules, `poller.env`, and the state file there. Run it from this directory after the pin.
+`./install.sh` creates `/srv/agentforce` and the `agentforce` user, then copies the poller modules, `poller.env`, and the state file there. The clone keeps the Python modules. The script removes `poller.env` from this directory after the copy. Run it from this directory after the pin.
 
 ```bash
 chmod +x install.sh
@@ -181,7 +190,7 @@ Leave `MAX_PASSES` unset (default `0`) to loop until you interrupt. For cron or 
 
 Empty or whitespace-only values for the optional integers and `EXPORTED_FILE` use the default. A value that is not a whole number exits 1. `POLL_INTERVAL`, `DISCOVERY_LIMIT`, and `SESSION_IDLE_SECONDS` clamp values below `1` to `1`. `MAX_PASSES` and `DISCOVERY_WINDOW_DAYS` clamp a negative to `0`.
 
-What HoneyHive stores for each conversation is in the [how-to](https://docs.honeyhive.ai/v2/integrations/salesforce-agentforce#what-honeyhive-receives).
+One Agentforce conversation becomes one HoneyHive session. After a pin, open [Traces > Sessions](https://app.us.honeyhive.ai/traces/sessions) and match the UUID after `as` on the `Exported N span(s) for <salesforce-id> as <honeyhive-uuid>` line. A first export of `N` spans shows `N + 1` events because HoneyHive adds the session row.
 
 ## Files
 
@@ -193,7 +202,7 @@ What HoneyHive stores for each conversation is in the [how-to](https://docs.hone
 | [`state.py`](./state.py) | Exported/rejected ledger |
 | [`config.py`](./config.py) [`net.py`](./net.py) [`salesforce_api.py`](./salesforce_api.py) | Settings, HTTP, Salesforce calls |
 | [`poller.env.example`](./poller.env.example) | Copy to `poller.env` |
-| [`install.sh`](./install.sh) | Move the poller onto `/srv/agentforce` |
+| [`install.sh`](./install.sh) | Copy the poller onto `/srv/agentforce` |
 | [`OPERATING.md`](./OPERATING.md) | State file, skip lines, recovery |
 
 ## Links
