@@ -6,9 +6,9 @@ import json
 import os
 from dataclasses import dataclass, field
 
-OPERATING_PIN = (
+README_PIN = (
     "https://github.com/honeyhiveai/cookbook/blob/main/"
-    "salesforce-agentforce-cookbook/OPERATING.md"
+    "salesforce-agentforce-cookbook/README.md"
 )
 
 REJECT_MESSAGES = {
@@ -21,13 +21,13 @@ REJECT_MESSAGES = {
         "Recorded {session_id} as rejected; the row has no readable "
         "start timestamp (missing_start). Pin SALESFORCE_SESSION_ID "
         "to retry, or fix the Data 360 row. Recovery: "
-        f"{OPERATING_PIN}"
+        f"{README_PIN}"
     ),
     "empty_missing_start": (
         "Recorded {session_id} as rejected; Salesforce returned no "
         "spans and no readable start (empty_missing_start). Pin "
         "SALESFORCE_SESSION_ID to retry, or fix the Data 360 row. "
-        f"Recovery: {OPERATING_PIN}"
+        f"Recovery: {README_PIN}"
     ),
     "unreadable": (
         "Recorded {session_id} as rejected; the poller could not "
