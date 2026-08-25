@@ -5,10 +5,12 @@ from __future__ import annotations
 import os
 import unittest
 import uuid
-from unittest.mock import patch
+from unittest.mock import Mock, patch
+
+import requests
 
 from otel_map import honeyhive_session_id
-from poll_agentforce import discovery_soql, resolved_session_id, skip_reason
+from poll_agentforce import HttpError, discovery_soql, http_json, resolved_session_id, skip_reason
 
 
 class DiscoverySoqlTest(unittest.TestCase):
@@ -32,6 +34,41 @@ class SkipReasonTest(unittest.TestCase):
 
     def test_complete_with_spans_exports(self) -> None:
         self.assertIsNone(skip_reason(complete=True, count=20))
+
+
+class HttpJsonTest(unittest.TestCase):
+    def test_posts_json_payload(self) -> None:
+        response = Mock()
+        response.ok = True
+        response.content = b"{}"
+        response.json.return_value = {"ok": True}
+        with patch("poll_agentforce.requests.request", return_value=response) as request:
+            payload = http_json("POST", "https://example.test/traces", json={"spans": []})
+        self.assertEqual(payload, {"ok": True})
+        request.assert_called_once()
+        _, kwargs = request.call_args
+        self.assertEqual(kwargs["json"], {"spans": []})
+        self.assertEqual(kwargs["timeout"], 120)
+
+    def test_invalid_json_becomes_http_error(self) -> None:
+        response = Mock()
+        response.ok = True
+        response.content = b"<html>"
+        response.json.side_effect = requests.exceptions.JSONDecodeError("bad", "", 0)
+        with patch("poll_agentforce.requests.request", return_value=response):
+            with self.assertRaises(HttpError) as raised:
+                http_json("GET", "https://example.test/otel")
+        self.assertIn("failed", str(raised.exception))
+
+    def test_http_error_includes_status(self) -> None:
+        response = Mock()
+        response.ok = False
+        response.status_code = 403
+        response.text = "denied"
+        with patch("poll_agentforce.requests.request", return_value=response):
+            with self.assertRaises(HttpError) as raised:
+                http_json("GET", "https://example.test/otel")
+        self.assertEqual(raised.exception.code, 403)
 
 
 class ResolvedSessionIdTest(unittest.TestCase):

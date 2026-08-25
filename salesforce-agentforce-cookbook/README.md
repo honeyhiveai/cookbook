@@ -2,7 +2,7 @@
 
 Poll [Salesforce Agentforce](https://www.salesforce.com/agentforce/) [Session Trace OTel](https://developer.salesforce.com/docs/ai/agentforce/guide/otel-api.html) and forward each conversation as one HoneyHive session.
 
-Agentforce does not push OpenTelemetry to an external endpoint. This cookbook is a small Python poller (standard library only) you can use as a starting point. Clone it, add your credentials, and run it locally or on a schedule.
+Agentforce does not push OpenTelemetry to an external endpoint. This cookbook is a small Python poller you can use as a starting point. Clone it, add your credentials, and run it locally or on a schedule.
 
 One Agentforce conversation becomes one HoneyHive session. Session Trace exports the full Agentforce graph, so one user turn is several events (the turn itself, a state update, a guardrail, a topic router, the topic LLM call, and an instruction check). The poller rewrites Salesforce kvlists and `agent.messages.*` keys into GenAI JSON strings so HoneyHive Input/Output panels fill in.
 
@@ -10,7 +10,7 @@ One Agentforce conversation becomes one HoneyHive session. Session Trace exports
 
 | Requirement | Where to get it |
 | --- | --- |
-| Python 3.10+ | Standard library only. No `pip` install |
+| Python 3.10+ | `uv` or `pip` to install `requirements.txt` |
 | Salesforce org with Agentforce and Data 360 | [Get Started with Agentforce](https://developer.salesforce.com/docs/ai/agentforce/guide/get-started.html) |
 | Agentforce Session Tracing plus an External Client App | Follow [Salesforce setup](#salesforce-setup) |
 | HoneyHive project API key | [Settings > Project > API Keys](https://app.us.honeyhive.ai/settings/project/keys) |
@@ -20,11 +20,14 @@ One Agentforce conversation becomes one HoneyHive session. Session Trace exports
 ```bash
 git clone https://github.com/honeyhiveai/cookbook.git
 cd cookbook/salesforce-agentforce-cookbook
+uv venv
+source .venv/bin/activate
+uv pip install -r requirements.txt
 cp poller.env.example poller.env
 chmod 0600 poller.env
 ```
 
-Fill in `poller.env`:
+The script loads `poller.env` from this directory. Fill it in:
 
 ```ini
 HH_API_KEY=<your-api-key>
@@ -48,9 +51,6 @@ Do this in the Salesforce org before you run the poller. Salesforce's [Session T
 Have at least one finished conversation with the activated agent first.
 
 ```bash
-set -a
-. ./poller.env
-set +a
 DRY_RUN=1 python3 poll_agentforce.py
 ```
 
@@ -64,18 +64,12 @@ Look for `Would export N span(s) for <salesforce-id> as <honeyhive-uuid>`. `N` i
 Same directory, same `poller.env`. This run POSTs to HoneyHive.
 
 ```bash
-set -a
-. ./poller.env
-set +a
 python3 poll_agentforce.py
 ```
 
 To export one session only:
 
 ```bash
-set -a
-. ./poller.env
-set +a
 SALESFORCE_SESSION_ID=<salesforce-id-from-a-would-export-line> python3 poll_agentforce.py
 ```
 
@@ -88,9 +82,6 @@ Exported IDs are stored in `.agentforce-exported.json` so a later run does not P
 The default is one pass (`MAX_PASSES=1`). To keep polling until you interrupt:
 
 ```bash
-set -a
-. ./poller.env
-set +a
 MAX_PASSES=0 python3 poll_agentforce.py
 ```
 
@@ -119,7 +110,8 @@ Salesforce documents a 72-hour export window. Conversations older than that are 
 | --- | --- |
 | [`poll_agentforce.py`](./poll_agentforce.py) | Discover, fetch, map, POST |
 | [`otel_map.py`](./otel_map.py) | Session grouping and I/O rewrite onto `gen_ai.input.messages` / `gen_ai.output.messages` |
-| [`poller.env.example`](./poller.env.example) | Copy to `poller.env` |
+| [`poller.env.example`](./poller.env.example) | Copy to `poller.env` (loaded automatically) |
+| [`requirements.txt`](./requirements.txt) | `python-dotenv` and `requests` |
 
 ## Links
 

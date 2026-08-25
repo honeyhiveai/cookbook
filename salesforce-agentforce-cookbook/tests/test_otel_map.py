@@ -305,6 +305,52 @@ class IoRewriteTest(unittest.TestCase):
             "InstructionAdherence: value=HIGH",
         )
 
+    def test_nested_json_output_messages_are_parsed(self) -> None:
+        payload = _payload(
+            "off_topic",
+            [
+                {"key": "step.type", "value": {"stringValue": "LLM_STEP"}},
+                {
+                    "key": "output.value",
+                    "value": {
+                        "kvlistValue": {
+                            "gen_ai.output.messages": (
+                                '[{"role":"assistant","content":"hello from json"}]'
+                            )
+                        }
+                    },
+                },
+            ],
+        )
+        stamp_and_map(payload, "5fd03ee0-c76d-4d57-9ed4-d43556ab8e73", "DemoAgent")
+        strings = _span_attr_strings(payload)
+        self.assertEqual(
+            json.loads(strings["gen_ai.output.messages"])[0]["content"],
+            "hello from json",
+        )
+
+    def test_json_object_output_keeps_raw_string(self) -> None:
+        payload = _payload(
+            "off_topic",
+            [
+                {"key": "step.type", "value": {"stringValue": "LLM_STEP"}},
+                {
+                    "key": "output.value",
+                    "value": {
+                        "kvlistValue": {
+                            "gen_ai.output.messages": '{"result":"HIGH","score":0.9}'
+                        }
+                    },
+                },
+            ],
+        )
+        stamp_and_map(payload, "5fd03ee0-c76d-4d57-9ed4-d43556ab8e73", "DemoAgent")
+        strings = _span_attr_strings(payload)
+        self.assertEqual(
+            json.loads(strings["gen_ai.output.messages"])[0]["content"],
+            '{"result":"HIGH","score":0.9}',
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

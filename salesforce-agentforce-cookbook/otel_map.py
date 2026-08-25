@@ -183,6 +183,20 @@ def last_content(messages: list, roles: tuple[str, ...]) -> str:
     return ""
 
 
+def assistant_output(raw_out) -> dict:
+    if isinstance(raw_out, str) and raw_out.strip() and not raw_out.lstrip().startswith(("[", "{")):
+        return {"role": "assistant", "content": raw_out.strip()}
+    out_messages = as_messages(raw_out)
+    content = last_content(out_messages, ("assistant", "model", "Output")) or message_text(
+        raw_out
+    )
+    if content:
+        return {"role": "assistant", "content": content}
+    if isinstance(raw_out, str) and raw_out.strip():
+        return {"role": "assistant", "content": raw_out.strip()}
+    return {}
+
+
 def agent_message_index(key: str) -> tuple[int, str] | None:
     if not key.endswith(".content"):
         return None
@@ -220,18 +234,11 @@ def map_io(attrs: dict) -> tuple[list, dict, str | None]:
         chat_history = as_messages(attrs.get("gen_ai.input.messages"))
 
     if isinstance(out_val, dict):
-        raw_out = out_val.get("gen_ai.output.messages")
-        if isinstance(raw_out, str) and raw_out.strip():
-            outputs = {"role": "assistant", "content": raw_out}
-        else:
-            out_messages = as_messages(raw_out)
-            content = last_content(out_messages, ("assistant", "model", "Output"))
-            if not content:
-                content = message_text(raw_out)
-            if not content:
-                content = message_text(
-                    out_val.get("af.router_classifier.selected_target")
-                ) or message_text(out_val.get("mgr.sensitive.step.result"))
+        outputs = assistant_output(out_val.get("gen_ai.output.messages"))
+        if not outputs.get("content"):
+            content = message_text(
+                out_val.get("af.router_classifier.selected_target")
+            ) or message_text(out_val.get("mgr.sensitive.step.result"))
             if content:
                 outputs = {"role": "assistant", "content": content}
         if not model and out_val.get("gen_ai.request.model"):
@@ -240,16 +247,7 @@ def map_io(attrs: dict) -> tuple[list, dict, str | None]:
         outputs = {"role": "assistant", "content": out_val}
 
     if not outputs.get("content") and attrs.get("gen_ai.output.messages") is not None:
-        raw_out = attrs.get("gen_ai.output.messages")
-        if isinstance(raw_out, str) and raw_out.strip() and not raw_out.lstrip().startswith(("[", "{")):
-            outputs = {"role": "assistant", "content": raw_out}
-        else:
-            out_messages = as_messages(raw_out)
-            content = last_content(out_messages, ("assistant", "model", "Output")) or message_text(
-                raw_out
-            )
-            if content:
-                outputs = {"role": "assistant", "content": content}
+        outputs = assistant_output(attrs.get("gen_ai.output.messages"))
 
     indexed = []
     for key, value in attrs.items():

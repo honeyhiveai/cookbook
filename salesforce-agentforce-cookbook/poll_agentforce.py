@@ -7,12 +7,16 @@ import json
 import os
 import time
 import uuid
-import urllib.error
-import urllib.parse
-import urllib.request
 from datetime import datetime, timezone
+from pathlib import Path
+from urllib.parse import quote
+
+import requests
+from dotenv import load_dotenv
 
 from otel_map import honeyhive_session_id, iter_spans, session_name_for, stamp_and_map
+
+load_dotenv(Path(__file__).with_name("poller.env"))
 
 API_VERSION = os.environ.get("SALESFORCE_API_VERSION", "v66.0").strip() or "v66.0"
 WINDOW_DAYS = int(os.environ.get("DISCOVERY_WINDOW_DAYS", "4") or "4")
@@ -53,28 +57,25 @@ def resolved_session_id(sf_session_id: str) -> str:
         raise SystemExit("HONEYHIVE_SESSION_ID must be a UUID") from None
 
 
-def http_json(method: str, url: str, headers: dict, data=None, form: bool = False):
-    body = None
-    req_headers = dict(headers)
-    if data is not None:
-        if form:
-            body = urllib.parse.urlencode(data).encode()
-            req_headers["Content-Type"] = "application/x-www-form-urlencoded"
-        else:
-            body = json.dumps(data).encode()
-            req_headers.setdefault("Content-Type", "application/json")
-    request = urllib.request.Request(url, data=body, headers=req_headers, method=method)
+def http_json(method: str, url: str, headers: dict | None = None, **kwargs):
     try:
-        with urllib.request.urlopen(request, timeout=120) as response:
-            raw = response.read()
-            if not raw:
-                return {}
-            return json.loads(raw.decode("utf-8", "replace"))
-    except urllib.error.HTTPError as exc:
-        err = exc.read().decode("utf-8", "replace")[:1000]
-        if err:
-            print(err)
-        raise HttpError(exc.code, f"{method} {url} failed: HTTP {exc.code}") from exc
+        response = requests.request(
+            method, url, headers=headers or {}, timeout=120, **kwargs
+        )
+        if not response.ok:
+            if response.text:
+                print(response.text[:1000])
+            raise HttpError(
+                response.status_code, f"{method} {url} failed: HTTP {response.status_code}"
+            )
+        if not response.content:
+            return {}
+        return response.json()
+    except HttpError:
+        raise
+    except requests.RequestException as exc:
+        code = getattr(getattr(exc, "response", None), "status_code", 0) or 0
+        raise HttpError(code, f"{method} {url} failed: {exc}") from exc
 
 
 def discovery_soql(window_days: int, limit: int) -> str:
@@ -95,13 +96,11 @@ def salesforce_token(instance: str) -> str:
     payload = http_json(
         "POST",
         f"{instance}/services/oauth2/token",
-        {},
-        {
+        data={
             "grant_type": "client_credentials",
             "client_id": env("SALESFORCE_CLIENT_ID"),
             "client_secret": env("SALESFORCE_CLIENT_SECRET"),
         },
-        form=True,
     )
     token = payload.get("access_token")
     if not token:
@@ -112,11 +111,9 @@ def salesforce_token(instance: str) -> str:
 def discover_sessions(instance: str, headers: dict) -> list[dict]:
     query = http_json(
         "GET",
-        (
-            f"{instance}/services/data/{API_VERSION}/query/"
-            f"?q={urllib.parse.quote(discovery_soql(WINDOW_DAYS, DISCOVERY_LIMIT))}"
-        ),
+        f"{instance}/services/data/{API_VERSION}/query/",
         headers,
+        params={"q": discovery_soql(WINDOW_DAYS, DISCOVERY_LIMIT)},
     )
     records = query.get("records")
     if not isinstance(records, list):
@@ -127,10 +124,7 @@ def discover_sessions(instance: str, headers: dict) -> list[dict]:
 def fetch_otel(instance: str, headers: dict, session_id: str) -> dict:
     payload = http_json(
         "GET",
-        (
-            f"{instance}/services/data/{API_VERSION}/einstein/audit/otel/"
-            f"{urllib.parse.quote(session_id, safe='')}"
-        ),
+        f"{instance}/services/data/{API_VERSION}/einstein/audit/otel/{quote(session_id, safe='')}",
         {**headers, "Accept": "application/json"},
     )
     if not isinstance(payload, dict):
@@ -233,7 +227,7 @@ def process_session(
     try:
         payload = fetch_otel(instance, sf_headers, session_id)
     except HttpError as exc:
-        print(f"Skip {session_id}: HTTP {exc.code}")
+        print(f"Skip {session_id}: {exc}")
         return False
     count = len(list(iter_spans(payload)))
     complete = pin or session_is_complete(record, payload)
@@ -257,7 +251,7 @@ def process_session(
             "POST",
             f"{hh_url}/opentelemetry/v1/traces",
             {"Authorization": f"Bearer {hh_key}"},
-            payload,
+            json=payload,
         )
     except HttpError as exc:
         print(f"HoneyHive POST failed for {session_id}: {exc}")
@@ -321,8 +315,8 @@ def main() -> None:
     if not preview:
         hh_url = env("HH_API_URL").rstrip("/")
         hh_key = env("HH_API_KEY")
-        if not hh_url.startswith(("https://", "http://")):
-            raise SystemExit("HH_API_URL must start with https:// or http://")
+        if not hh_url.startswith("https://"):
+            raise SystemExit("HH_API_URL must start with https://")
     only = os.environ.get("SALESFORCE_SESSION_ID", "").strip()
     exported = set() if preview else load_exported(EXPORTED_FILE)
     passes = 0
