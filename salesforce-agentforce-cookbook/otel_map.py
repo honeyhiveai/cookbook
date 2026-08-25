@@ -97,10 +97,10 @@ def iter_spans(payload: dict):
 
 
 def honeyhive_session_id(sf_session_id: str) -> str:
-    try:
-        return str(uuid.UUID(sf_session_id))
-    except ValueError:
-        return str(uuid.uuid5(uuid.NAMESPACE_URL, f"agentforce:{sf_session_id}"))
+    # Salesforce session ids are already UUIDs. Reusing them as the HoneyHive
+    # session_id makes the Traces session page open a child turn instead of
+    # the conversation. Derive a distinct id.
+    return str(uuid.uuid5(uuid.NAMESPACE_URL, f"agentforce:{sf_session_id}"))
 
 
 def replace_or_add(items: list, key: str, value) -> None:
@@ -147,15 +147,22 @@ def stamp_and_map(payload: dict, hh_session_id: str, session_name: str) -> None:
             resource = {}
             resource_wrap["resource"] = resource
         resource_attrs = _resource_attrs(resource)
+        # HoneyHive creates the session row from this flag. Without it, a
+        # child span can show up as the session in the UI.
         replace_or_add(resource_attrs, "honeyhive.session_id", hh_session_id)
+        replace_or_add(resource_attrs, "honeyhive.session_auto_create", True)
         replace_or_add(resource_attrs, "gen_ai.conversation.id", hh_session_id)
         if session_name:
+            replace_or_add(resource_attrs, "honeyhive.session_name", session_name)
             replace_or_add(resource_attrs, "gen_ai.agent.name", session_name)
         for scope in resource_wrap.get("scopeSpans") or []:
             for span in scope.get("spans") or []:
                 items = _span_attrs(span)
                 replace_or_add(items, "honeyhive.session_id", hh_session_id)
+                replace_or_add(items, "honeyhive.session_auto_create", True)
                 replace_or_add(items, "gen_ai.conversation.id", hh_session_id)
+                if session_name:
+                    replace_or_add(items, "honeyhive.session_name", session_name)
                 kind = openinference_span_kind(span, span_attr_map(items))
                 replace_or_add(items, "openinference.span.kind", kind)
 

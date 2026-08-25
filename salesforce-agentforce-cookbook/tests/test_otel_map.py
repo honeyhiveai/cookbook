@@ -13,9 +13,13 @@ from otel_map import (
 
 
 class SessionIdTest(unittest.TestCase):
-    def test_uuid_passthrough(self) -> None:
+    def test_salesforce_uuid_is_not_reused(self) -> None:
         sid = "5fd03ee0-c76d-4d57-9ed4-d43556ab8e73"
-        self.assertEqual(honeyhive_session_id(sid), sid)
+        derived = honeyhive_session_id(sid)
+        self.assertNotEqual(derived, sid)
+        self.assertEqual(
+            derived, str(uuid.uuid5(uuid.NAMESPACE_URL, f"agentforce:{sid}"))
+        )
 
     def test_non_uuid_is_stable_uuid5(self) -> None:
         sid = "not-a-uuid"
@@ -85,11 +89,17 @@ class StampTest(unittest.TestCase):
             ]
         }
         self.assertIn("honeyhive.session_id", resource_keys)
+        self.assertIn("honeyhive.session_auto_create", resource_keys)
+        self.assertIn("honeyhive.session_name", resource_keys)
         self.assertIn("gen_ai.conversation.id", resource_keys)
         self.assertIn("gen_ai.agent.name", resource_keys)
         self.assertEqual(span_attrs["openinference.span.kind"]["stringValue"], "LLM")
         self.assertEqual(
             span_attrs["gen_ai.request.model"]["stringValue"], "gpt-4o"
+        )
+        self.assertTrue(span_attrs["honeyhive.session_auto_create"]["boolValue"])
+        self.assertEqual(
+            span_attrs["honeyhive.session_name"]["stringValue"], "DemoAgent"
         )
         self.assertNotIn("honeyhive_event_type", span_attrs)
         self.assertFalse(

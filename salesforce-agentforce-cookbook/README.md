@@ -79,7 +79,7 @@ set +a
 SALESFORCE_SESSION_ID=<salesforce-id-from-a-would-export-line> python3 poll_agentforce.py
 ```
 
-On success the script prints `Exported N span(s) for <salesforce-id> as <honeyhive-uuid>`. Open [Traces > Sessions](https://app.us.honeyhive.ai/traces/sessions) and match that UUID. A first export of `N` spans shows `N + 1` events because HoneyHive adds the session row.
+On success the script prints `Exported N span(s) for <salesforce-id> as <honeyhive-uuid>`. Open [Traces > Sessions](https://app.us.honeyhive.ai/traces/sessions) and match the **HoneyHive UUID** (it is derived from the Salesforce id, not equal to it). A first export of `N` spans shows `N + 1` events because HoneyHive adds the session row.
 
 Exported IDs are stored in `.agentforce-exported.json` so a later run does not POST the same session again.
 
