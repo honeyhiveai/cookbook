@@ -1,11 +1,15 @@
-"""Behavior specs for session ID and first-write-wins mapping."""
+"""Behavior specs for public session grouping and span kind."""
 
 from __future__ import annotations
 
 import unittest
 import uuid
 
-from otel_map import honeyhive_session_id, map_io
+from otel_map import (
+    honeyhive_session_id,
+    openinference_span_kind,
+    stamp_and_map,
+)
 
 
 class SessionIdTest(unittest.TestCase):
@@ -17,37 +21,80 @@ class SessionIdTest(unittest.TestCase):
         sid = "not-a-uuid"
         expected = str(uuid.uuid5(uuid.NAMESPACE_URL, f"agentforce:{sid}"))
         self.assertEqual(honeyhive_session_id(sid), expected)
-        self.assertEqual(honeyhive_session_id(sid), honeyhive_session_id(sid))
 
 
-class MapIoFirstWriteWinsTest(unittest.TestCase):
-    def test_gen_ai_wins_over_agent_messages(self) -> None:
-        attrs = {
-            "input.value": {
-                "gen_ai.input.messages": [
-                    {"role": "user", "content": "from gen_ai"},
-                ]
-            },
-            "output.value": {
-                "gen_ai.output.messages": [
-                    {"role": "assistant", "content": "gen_ai completion"},
-                ]
-            },
-            "agent.messages.user.0.content": "from agent messages",
-            "agent.messages.assistant.0.content": "agent assistant",
+class SpanKindTest(unittest.TestCase):
+    def test_llm_step_is_llm(self) -> None:
+        self.assertEqual(
+            openinference_span_kind({"name": "chat"}, {"step.type": "LLM_STEP"}),
+            "LLM",
+        )
+
+    def test_state_update_is_tool(self) -> None:
+        self.assertEqual(
+            openinference_span_kind(
+                {"name": "__state_update_action__"}, {"step.type": "VARIABLE_UPDATE_STEP"}
+            ),
+            "TOOL",
+        )
+
+    def test_turn_is_chain(self) -> None:
+        self.assertEqual(
+            openinference_span_kind({"name": "GeneralFAQ"}, {}),
+            "CHAIN",
+        )
+
+
+class StampTest(unittest.TestCase):
+    def test_stamps_public_session_and_kind_only(self) -> None:
+        payload = {
+            "resourceSpans": [
+                {
+                    "resource": {"attributes": []},
+                    "scopeSpans": [
+                        {
+                            "spans": [
+                                {
+                                    "name": "chat",
+                                    "attributes": [
+                                        {
+                                            "key": "step.type",
+                                            "value": {"stringValue": "LLM_STEP"},
+                                        },
+                                        {
+                                            "key": "gen_ai.request.model",
+                                            "value": {"stringValue": "gpt-4o"},
+                                        },
+                                    ],
+                                }
+                            ]
+                        }
+                    ],
+                }
+            ]
         }
-        inputs, outputs, _config = map_io(attrs)
-        self.assertEqual(inputs["chat_history"][0]["content"], "from gen_ai")
-        self.assertEqual(outputs["content"], "gen_ai completion")
-
-    def test_agent_messages_fill_when_gen_ai_missing(self) -> None:
-        attrs = {
-            "agent.messages.user.0.content": "user turn",
-            "agent.messages.assistant.0.content": "assistant turn",
+        stamp_and_map(payload, "5fd03ee0-c76d-4d57-9ed4-d43556ab8e73", "DemoAgent")
+        resource_keys = {
+            item["key"]
+            for item in payload["resourceSpans"][0]["resource"]["attributes"]
         }
-        inputs, outputs, _config = map_io(attrs)
-        self.assertEqual(inputs["user_message"], "user turn")
-        self.assertEqual(outputs["content"], "assistant turn")
+        span_attrs = {
+            item["key"]: item["value"]
+            for item in payload["resourceSpans"][0]["scopeSpans"][0]["spans"][0][
+                "attributes"
+            ]
+        }
+        self.assertIn("honeyhive.session_id", resource_keys)
+        self.assertIn("gen_ai.conversation.id", resource_keys)
+        self.assertIn("gen_ai.agent.name", resource_keys)
+        self.assertEqual(span_attrs["openinference.span.kind"]["stringValue"], "LLM")
+        self.assertEqual(
+            span_attrs["gen_ai.request.model"]["stringValue"], "gpt-4o"
+        )
+        self.assertNotIn("honeyhive_event_type", span_attrs)
+        self.assertFalse(
+            any(key.startswith("honeyhive_inputs") for key in span_attrs)
+        )
 
 
 if __name__ == "__main__":

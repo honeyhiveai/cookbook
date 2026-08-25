@@ -117,7 +117,7 @@ Salesforce documents a 72-hour export window. Sessions older than that are gone.
 | File | Purpose |
 | --- | --- |
 | [`poll_agentforce.py`](./poll_agentforce.py) | Discover, fetch, map, POST |
-| [`otel_map.py`](./otel_map.py) | HoneyHive session stamps and span mapping |
+| [`otel_map.py`](./otel_map.py) | Public session grouping and OpenInference span kind |
 | [`poller.env.example`](./poller.env.example) | Copy to `poller.env` |
 
 ## Links
