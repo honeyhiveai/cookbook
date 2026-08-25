@@ -4,7 +4,7 @@ Poll [Salesforce Agentforce](https://www.salesforce.com/agentforce/) [Session Tr
 
 Agentforce does not push OpenTelemetry to an external endpoint. This cookbook is a small Python poller (standard library only) you can use as a starting point. Clone it, add your credentials, and run it locally or on a schedule.
 
-One Agentforce conversation becomes one HoneyHive session. Session Trace exports the full Agentforce graph, so one user turn is several events (the turn itself, a state update, a guardrail, a topic router, the topic LLM call, and an instruction check). The poller rewrites Salesforce kvlists and `agent.messages.*` keys into GenAI / OpenInference JSON strings so HoneyHive Input/Output panels fill in.
+One Agentforce conversation becomes one HoneyHive session. Session Trace exports the full Agentforce graph, so one user turn is several events (the turn itself, a state update, a guardrail, a topic router, the topic LLM call, and an instruction check). The poller rewrites Salesforce kvlists and `agent.messages.*` keys into GenAI JSON strings so HoneyHive Input/Output panels fill in.
 
 ## Prerequisites
 
@@ -118,7 +118,7 @@ Salesforce documents a 72-hour export window. Conversations older than that are 
 | File | Purpose |
 | --- | --- |
 | [`poll_agentforce.py`](./poll_agentforce.py) | Discover, fetch, map, POST |
-| [`otel_map.py`](./otel_map.py) | Session grouping, span kind, and I/O rewrite onto public GenAI / OpenInference JSON strings |
+| [`otel_map.py`](./otel_map.py) | Session grouping and I/O rewrite onto public GenAI JSON strings |
 | [`poller.env.example`](./poller.env.example) | Copy to `poller.env` |
 
 ## Links
