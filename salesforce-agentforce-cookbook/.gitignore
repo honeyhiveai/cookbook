@@ -1,6 +1,5 @@
 poller.env
 .agentforce-exported.json
-.agentforce-exported.json.tmp
 __pycache__/
 *.pyc
 .venv/

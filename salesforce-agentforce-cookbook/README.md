@@ -2,7 +2,7 @@
 
 Poll [Salesforce Agentforce](https://www.salesforce.com/agentforce/) [Session Trace OTel](https://developer.salesforce.com/docs/ai/agentforce/guide/otel-api.html) and forward each conversation as one HoneyHive session.
 
-Agentforce does not push OpenTelemetry to an external endpoint. This cookbook is a beta reference poller (Python standard library only). Salesforce setup is below. Skip lines, the state file, and recovery are in [If something looks wrong](#if-something-looks-wrong).
+Agentforce does not push OpenTelemetry to an external endpoint. This cookbook is a beta reference poller (Python standard library only). Copy it and run it wherever you want.
 
 One Agentforce conversation becomes one HoneyHive session with turn, model, and tool events.
 
@@ -14,7 +14,6 @@ One Agentforce conversation becomes one HoneyHive session with turn, model, and 
 | Salesforce org with Agentforce and Data 360 | [Get Started with Agentforce](https://developer.salesforce.com/docs/ai/agentforce/guide/get-started.html) |
 | Agentforce Session Tracing plus an External Client App | Follow [Salesforce setup](#salesforce-setup) |
 | HoneyHive project API key | [Settings > Project > API Keys](https://app.us.honeyhive.ai/settings/project/keys) |
-| A host with persistent storage | Needed for `.agentforce-exported.json`. systemd steps below assume Linux with root |
 
 ## Setup
 
@@ -25,7 +24,7 @@ cp poller.env.example poller.env
 chmod 0600 poller.env
 ```
 
-Fill in `poller.env` with an editor. Values must be unquoted and free of `$`, backticks, and spaces. Do not start a line with `export`, and do not indent keys. Leave `SALESFORCE_SESSION_ID`, `HONEYHIVE_SESSION_ID`, `HONEYHIVE_SESSION_NAME`, `MAX_PASSES`, and `DRY_RUN` out of this file. Pass those inline on a preview or pin.
+Fill in `poller.env`:
 
 ```ini
 HH_API_KEY=<your-api-key>
@@ -34,8 +33,6 @@ SALESFORCE_INSTANCE_URL=https://mydomain.my.salesforce.com
 SALESFORCE_CLIENT_ID=<eca-consumer-key>
 SALESFORCE_CLIENT_SECRET=<eca-consumer-secret>
 ```
-
-`ls -l poller.env` should show `-rw-------`.
 
 ## Salesforce setup
 
@@ -48,189 +45,80 @@ Do this in the Salesforce org before you run the poller. Salesforce's [Session T
 
 ## Preview
 
-Have at least one finished conversation with the activated agent first. Discovery only returns sessions Data 360 has written.
+Have at least one finished conversation with the activated agent first.
 
 ```bash
 set -a
 . ./poller.env
 set +a
-HONEYHIVE_SESSION_ID= HONEYHIVE_SESSION_NAME= SALESFORCE_SESSION_ID= DRY_RUN=1 MAX_PASSES=1 python3 poll_agentforce.py
+DRY_RUN=1 python3 poll_agentforce.py
 ```
 
-Read a `Would export N span(s) for <salesforce-id> as <honeyhive-uuid> (ended <end-or-unset>)` line. `N` is spans, not turns: one Agentforce turn is several spans, so a three-turn chat can print `Would export 20 span(s)`.
+Look for `Would export N span(s) for <salesforce-id> as <honeyhive-uuid>`. `N` is spans, not turns: one Agentforce turn is several spans.
 
-- Pin the Salesforce ID after `for` on a `Would export` line you know has ended.
-- A dry run does not read or write `.agentforce-exported.json`, and it skips the HoneyHive credential check.
-- `ended unset` means the idle bound decided the conversation was finished. Any other value means Salesforce set `ssot__EndTimestamp__c`.
+- `Skip <id>: in-progress` means the conversation is still going.
+- `Skip <id>: no spans yet` means Data 360 has the session row but OTel spans have not joined yet.
 
-A sample looks like this:
+## Export
 
-```text
-Discovered 20 session(s), 20 pending, 0 rejected
-Pending: 01a02190-7c5e-74ee-b4a8-eff86af959e7, 7c1b9f22-3d41-4a88-9f0e-2b6c5d8e1a47, 5fd03ee0-c76d-4d57-9ed4-d43556ab8e73, ...
-Skip 01a02190-7c5e-74ee-b4a8-eff86af959e7: no spans yet, Data 360 join is still catching up
-Skip in-progress 7c1b9f22-3d41-4a88-9f0e-2b6c5d8e1a47
-Would export 20 span(s) for 5fd03ee0-c76d-4d57-9ed4-d43556ab8e73 as 5fd03ee0-c76d-4d57-9ed4-d43556ab8e73 (ended unset)
-```
-
-Match skip lines in [If something looks wrong](#if-something-looks-wrong).
-
-## Pin one conversation
-
-Pin from the same directory, with the same `poller.env`. Do not create the service account yet.
+Same directory, same `poller.env`. This run POSTs to HoneyHive.
 
 ```bash
 set -a
 . ./poller.env
 set +a
-HONEYHIVE_SESSION_ID= HONEYHIVE_SESSION_NAME= DRY_RUN= SALESFORCE_SESSION_ID=<salesforce-id-from-a-would-export-line> MAX_PASSES=1 python3 poll_agentforce.py
+python3 poll_agentforce.py
 ```
 
-On success this prints `Exported N span(s) for <salesforce-id> as <honeyhive-uuid>` and exits 0. Keep `MAX_PASSES=1`. A pin skips the completeness check, so it exports whatever Data 360 has joined at that moment.
-
-If you are not certain the conversation has ended, mint a fresh HoneyHive UUID so the snapshot stays off the UUID discovery would use:
-
-```bash
-python3 -c "import uuid; print(uuid.uuid4())"
-set -a
-. ./poller.env
-set +a
-HONEYHIVE_SESSION_NAME= DRY_RUN= SALESFORCE_SESSION_ID=<salesforce-id-from-a-would-export-line> HONEYHIVE_SESSION_ID=<minted-uuid> MAX_PASSES=1 python3 poll_agentforce.py
-```
-
-Confirm the value after `as` is the literal you passed.
-
-Then open [Traces > Sessions](https://app.us.honeyhive.ai/traces/sessions), find the row matching the UUID after `as`, and expect `N + 1` events for an `Exported N span(s)` line. HoneyHive adds the session row.
-
-## Run the poller
-
-Once that session lands in the right HoneyHive project with the turn count you expect, supervise the poller as a long-lived process. Do not run two pollers against one org.
-
-Keep the host NTP-synced. Completeness and the 72-hour check both compare the host clock against Salesforce timestamps.
-
-Downtime longer than Salesforce's 72-hour export window loses those conversations permanently.
-
-### systemd
-
-`./install.sh` creates `/srv/agentforce` and the `agentforce` user, then copies the poller modules, `poller.env`, and the state file there. The clone keeps the Python modules. The script removes `poller.env` from this directory after the copy. Run it from this directory after the pin.
-
-```bash
-chmod +x install.sh
-./install.sh
-```
-
-Write `/etc/systemd/system/agentforce-poller.service`:
-
-```ini
-[Unit]
-Description=HoneyHive Agentforce session-trace poller
-StartLimitIntervalSec=1800
-StartLimitBurst=3
-
-[Service]
-User=agentforce
-WorkingDirectory=/srv/agentforce
-EnvironmentFile=/srv/agentforce/poller.env
-Environment=PYTHONUNBUFFERED=1
-ExecStart=/usr/bin/python3 /srv/agentforce/poll_agentforce.py
-Restart=on-failure
-RestartSec=30
-
-[Install]
-WantedBy=multi-user.target
-```
-
-Confirm `poller.env` has no keep-outs, then start the unit:
-
-```bash
-sudo -u agentforce grep -nE '^[[:space:]]*(SALESFORCE_SESSION_ID|HONEYHIVE_SESSION_ID|HONEYHIVE_SESSION_NAME|MAX_PASSES|DRY_RUN)=' /srv/agentforce/poller.env
-sudo systemctl daemon-reload
-sudo systemctl enable --now agentforce-poller
-```
-
-From here on, every preview and pin runs from `/srv/agentforce` as `agentforce`:
-
-```bash
-sudo -u agentforce bash -c 'cd /srv/agentforce && set -a && . ./poller.env && set +a && HONEYHIVE_SESSION_ID= HONEYHIVE_SESSION_NAME= SALESFORCE_SESSION_ID= DRY_RUN=1 MAX_PASSES=1 python3 poll_agentforce.py'
-```
-
-`systemctl status` showing running is not evidence the poller is exporting. Read `journalctl -u agentforce-poller` and match lines in [If something looks wrong](#if-something-looks-wrong).
-
-### One-shot without systemd
+To export one session only:
 
 ```bash
 set -a
 . ./poller.env
 set +a
-HONEYHIVE_SESSION_ID= HONEYHIVE_SESSION_NAME= SALESFORCE_SESSION_ID= DRY_RUN= MAX_PASSES=1 python3 poll_agentforce.py
+SALESFORCE_SESSION_ID=<salesforce-id-from-a-would-export-line> python3 poll_agentforce.py
 ```
 
-Leave `MAX_PASSES` unset (default `0`) to loop until you interrupt. For cron or a Kubernetes `CronJob`, keep `MAX_PASSES=1` and make overlap impossible (`flock`, or `concurrencyPolicy: Forbid`).
+On success the script prints `Exported N span(s) for <salesforce-id> as <honeyhive-uuid>`. Open [Traces > Sessions](https://app.us.honeyhive.ai/traces/sessions) and match that UUID. A first export of `N` spans shows `N + 1` events because HoneyHive adds the session row.
+
+Exported IDs are stored in `.agentforce-exported.json` so a later run does not POST the same session again.
+
+## Run it again
+
+The default is one pass (`MAX_PASSES=1`). To keep polling until you interrupt:
+
+```bash
+set -a
+. ./poller.env
+set +a
+MAX_PASSES=0 python3 poll_agentforce.py
+```
+
+Deploy that however you want: a terminal, cron, or a container. This is a beta reference, not a packaged service.
+
+Salesforce documents a 72-hour export window. Sessions older than that are gone.
 
 ## Environment variables
 
 | Variable | Required | Purpose |
 | --- | --- | --- |
 | `HH_API_KEY` | Yes, unless `DRY_RUN=1` | HoneyHive project API key |
-| `HH_API_URL` | Yes, unless `DRY_RUN=1` | HoneyHive data plane base URL. Must start with `https://` or `http://`. Use `http://` only for an in-cluster self-hosted endpoint |
+| `HH_API_URL` | Yes, unless `DRY_RUN=1` | HoneyHive data plane base URL |
 | `SALESFORCE_INSTANCE_URL` | Yes | My Domain login host (`https://<domain>.my.salesforce.com`) |
 | `SALESFORCE_CLIENT_ID` | Yes | External Client App consumer key |
 | `SALESFORCE_CLIENT_SECRET` | Yes | External Client App consumer secret |
-| `SALESFORCE_API_VERSION` | No | REST API version (default `v66.0`). Keep the `v` prefix |
-| `POLL_INTERVAL` | No | Seconds between passes (default `60`) |
-| `MAX_PASSES` | No | Stop after this many loops (default `0`). Pass inline, not in `poller.env` |
-| `DRY_RUN` | No | `1` / `true` / `yes` fetches without POSTing. Pass inline |
-| `SALESFORCE_SESSION_ID` | No | Export this session only. Pass inline |
-| `HONEYHIVE_SESSION_ID` | No | HoneyHive session UUID for a pin. Pass inline |
-| `HONEYHIVE_SESSION_NAME` | No | Sessions-tab row name for a pin. Pass inline |
-| `DISCOVERY_WINDOW_DAYS` | No | How many calendar days of sessions to discover (default `4`) |
-| `DISCOVERY_LIMIT` | No | Maximum sessions per discovery pass (default `20`) |
-| `SESSION_IDLE_SECONDS` | No | Idle bound in seconds (default `120`) |
-| `EXPORTED_FILE` | No | JSON file of exported and rejected IDs (default `.agentforce-exported.json`) |
-
-Empty or whitespace-only values for the optional integers and `EXPORTED_FILE` use the default. A value that is not a whole number exits 1. `POLL_INTERVAL`, `DISCOVERY_LIMIT`, and `SESSION_IDLE_SECONDS` clamp values below `1` to `1`. `MAX_PASSES` and `DISCOVERY_WINDOW_DAYS` clamp a negative to `0`.
-
-One Agentforce conversation becomes one HoneyHive session. After a pin, open [Traces > Sessions](https://app.us.honeyhive.ai/traces/sessions) and match the UUID after `as` on the `Exported N span(s) for <salesforce-id> as <honeyhive-uuid>` line. A first export of `N` spans shows `N + 1` events because HoneyHive adds the session row.
-
-## If something looks wrong
-
-`.agentforce-exported.json` is the duplicate guard. Two pollers against the same org double-POST. Losing the file re-exports every completed session still inside the discovery window. `DRY_RUN=1` skips the file.
-
-Stop the poller before you edit the file. An edit made while it runs is overwritten on the next write. To retry a rejected ID, remove it from `rejected` (keep both lists as JSON arrays) and restart. Removing an ID only helps while Salesforce still serves the payload (72 hours) and discovery still returns it. Otherwise pin.
-
-A leftover `{EXPORTED_FILE}.tmp` that parses as JSON stops every later start. Stop the poller, then `sudo -u agentforce mv` it onto `{EXPORTED_FILE}` if it is a JSON object with `exported` and `rejected` lists. Anything else: delete it rather than moving it. Then `systemctl reset-failed agentforce-poller`.
-
-| Line | Meaning |
-| --- | --- |
-| `Skip in-progress <id>` | Newest span is still inside `SESSION_IDLE_SECONDS` |
-| `Skip <id>: no spans yet, Data 360 join is still catching up` | Session row exists, OTel spans have not joined yet |
-| `Skip <id>: empty spans` | Discovery on a real pass, once |
-| `Hit DISCOVERY_LIMIT=...` | Newest-N dropped older sessions this process has not seen |
-| `Discovered 0 session(s)` | No conversation yet, outside `DISCOVERY_WINDOW_DAYS`, or Data 360 has no rows |
-
-`Would export` / `Exported N span(s)` is spans, not turns. `ended unset` means idle treated it as finished. `ended unknown` is a pin.
-
-Pin when discovery will not see the ID again (rejected, or scrolled out of newest-N). Keep `MAX_PASSES=1`. A conversation still printing `Skip in-progress` is not finished. If you pin one anyway, pass a fresh `HONEYHIVE_SESSION_ID` so the snapshot stays off the UUID discovery would use.
-
-A truncated first export: pin again with a fresh `HONEYHIVE_SESSION_ID`. Removing the ID from `exported` and letting discovery retry duplicates turns on the same HoneyHive session unless the first export used a custom UUID.
-
-Printed reject slugs: `expired` (start past 72 hours, or empty spans past 72 hours), `missing_start` / `empty_missing_start` (null start), `unreadable`, `mapping`, `hh_400`. Salesforce `401` and quota `403` retry. HoneyHive `401`/`403`/`404` and Salesforce `INSUFFICIENT_ACCESS` / `API_DISABLED_FOR_ORG` exit 1.
-
-If discovery lists IDs and every fetch returns `404`, refresh `AiAgentSession`, `AiAgentInteraction`, `AiAgentInteractionMessage`, and `AiAgentInteractionStep` in **Data Cloud > Data Streams**. A `404` on every request, including discovery, can also mean the org does not support `SALESFORCE_API_VERSION` (default `v66.0`). `GET {SALESFORCE_INSTANCE_URL}/services/data/` lists the versions the org does support.
-
-Raise `SESSION_IDLE_SECONDS` above how long a person takes to answer after the agent's last reply, plus Data 360 join lag. Size `DISCOVERY_LIMIT` against conversations started in the whole window, not against the ones still pending. Raise `POLL_INTERVAL` on a Developer Edition org or after a quota `403`.
+| `DRY_RUN` | No | `1` fetches without POSTing |
+| `SALESFORCE_SESSION_ID` | No | Export this session only |
+| `MAX_PASSES` | No | Stop after this many loops (default `1`). `0` loops until interrupted |
+| `POLL_INTERVAL` | No | Seconds between loops when `MAX_PASSES=0` (default `60`) |
 
 ## Files
 
 | File | Purpose |
 | --- | --- |
-| [`poll_agentforce.py`](./poll_agentforce.py) | Entrypoint: pin and discovery loops, POST OTLP |
+| [`poll_agentforce.py`](./poll_agentforce.py) | Discover, fetch, map, POST |
 | [`otel_map.py`](./otel_map.py) | HoneyHive session stamps and span mapping |
-| [`policy.py`](./policy.py) | Idle bound, 72-hour window, skip/reject decisions |
-| [`state.py`](./state.py) | Exported/rejected ledger |
-| [`config.py`](./config.py) [`net.py`](./net.py) [`salesforce_api.py`](./salesforce_api.py) | Settings, HTTP, Salesforce calls |
 | [`poller.env.example`](./poller.env.example) | Copy to `poller.env` |
-| [`install.sh`](./install.sh) | Copy the poller onto `/srv/agentforce` |
 
 ## Links
 
