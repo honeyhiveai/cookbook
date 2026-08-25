@@ -276,11 +276,16 @@ def map_io(attrs: dict) -> tuple[list, dict, str | None]:
     return chat_history, outputs, model
 
 
+def drop_keys(items: list, keys: set[str]) -> None:
+    items[:] = [item for item in items if item.get("key") not in keys]
+
+
 def rewrite_io(items: list, attrs: dict, kind: str) -> None:
     # CHAIN (turn) spans must not get OpenInference input.value. HoneyHive keeps
     # that attribute as a raw string on chain events, which hides the messages.
     chat_history, outputs, model = map_io(attrs)
     if kind == "TOOL":
+        drop_keys(items, {"input.value", "output.value"})
         return
     if chat_history:
         replace_or_add(items, "gen_ai.input.messages", json.dumps(chat_history, default=str))
@@ -289,6 +294,8 @@ def rewrite_io(items: list, attrs: dict, kind: str) -> None:
             if model:
                 payload["model"] = model
             replace_or_add(items, "input.value", json.dumps(payload, default=str))
+    else:
+        drop_keys(items, {"input.value"})
     if outputs.get("content"):
         out_messages = [
             {"role": outputs.get("role") or "assistant", "content": outputs["content"]}
@@ -296,6 +303,8 @@ def rewrite_io(items: list, attrs: dict, kind: str) -> None:
         replace_or_add(items, "gen_ai.output.messages", json.dumps(out_messages, default=str))
         if kind == "LLM":
             replace_or_add(items, "output.value", json.dumps(outputs, default=str))
+    else:
+        drop_keys(items, {"output.value"})
     if model:
         replace_or_add(items, "gen_ai.request.model", model)
 

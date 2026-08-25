@@ -267,6 +267,37 @@ class IoRewriteTest(unittest.TestCase):
         self.assertNotIn("gen_ai.output.messages", strings)
         self.assertEqual(strings["openinference.span.kind"], "TOOL")
 
+    def test_guardrail_without_messages_drops_leftover_input(self) -> None:
+        payload = _payload(
+            "InstructionAdherence",
+            [
+                {
+                    "key": "step.type",
+                    "value": {"stringValue": "TRUST_GUARDRAILS_STEP"},
+                },
+                {
+                    "key": "input.value",
+                    "value": {"kvlistValue": {"af.request_id": "abc"}},
+                },
+                {
+                    "key": "output.value",
+                    "value": {
+                        "kvlistValue": {
+                            "gen_ai.output.messages": "InstructionAdherence: value=HIGH"
+                        }
+                    },
+                },
+            ],
+        )
+        stamp_and_map(payload, "5fd03ee0-c76d-4d57-9ed4-d43556ab8e73", "DemoAgent")
+        strings = _span_attr_strings(payload)
+        self.assertNotIn("gen_ai.input.messages", strings)
+        self.assertNotIn("input.value", strings)
+        self.assertEqual(
+            json.loads(strings["gen_ai.output.messages"])[0]["content"],
+            "InstructionAdherence: value=HIGH",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
