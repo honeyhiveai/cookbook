@@ -1,15 +1,36 @@
-"""Behavior specs for public session grouping and span kind."""
+"""Behavior specs for public session grouping, span kind, and I/O rewrite."""
 
 from __future__ import annotations
 
+import json
 import unittest
 import uuid
 
 from otel_map import (
+    attr,
     honeyhive_session_id,
     openinference_span_kind,
     stamp_and_map,
 )
+
+
+def _span_attr_strings(payload: dict) -> dict:
+    return {
+        item["key"]: item["value"].get("stringValue")
+        for item in payload["resourceSpans"][0]["scopeSpans"][0]["spans"][0]["attributes"]
+        if "stringValue" in (item.get("value") or {})
+    }
+
+
+def _payload(name: str, attributes: list) -> dict:
+    return {
+        "resourceSpans": [
+            {
+                "resource": {"attributes": []},
+                "scopeSpans": [{"spans": [{"name": name, "attributes": attributes}]}],
+            }
+        ]
+    }
 
 
 class SessionIdTest(unittest.TestCase):
@@ -49,34 +70,24 @@ class SpanKindTest(unittest.TestCase):
         )
 
 
+class AttrEncodingTest(unittest.TestCase):
+    def test_dict_becomes_json_string(self) -> None:
+        encoded = attr("input.value", {"messages": [{"role": "user", "content": "hi"}]})
+        self.assertEqual(
+            json.loads(encoded["value"]["stringValue"]),
+            {"messages": [{"role": "user", "content": "hi"}]},
+        )
+
+
 class StampTest(unittest.TestCase):
     def test_stamps_public_session_and_kind_only(self) -> None:
-        payload = {
-            "resourceSpans": [
-                {
-                    "resource": {"attributes": []},
-                    "scopeSpans": [
-                        {
-                            "spans": [
-                                {
-                                    "name": "chat",
-                                    "attributes": [
-                                        {
-                                            "key": "step.type",
-                                            "value": {"stringValue": "LLM_STEP"},
-                                        },
-                                        {
-                                            "key": "gen_ai.request.model",
-                                            "value": {"stringValue": "gpt-4o"},
-                                        },
-                                    ],
-                                }
-                            ]
-                        }
-                    ],
-                }
-            ]
-        }
+        payload = _payload(
+            "chat",
+            [
+                {"key": "step.type", "value": {"stringValue": "LLM_STEP"}},
+                {"key": "gen_ai.request.model", "value": {"stringValue": "gpt-4o"}},
+            ],
+        )
         stamp_and_map(payload, "5fd03ee0-c76d-4d57-9ed4-d43556ab8e73", "DemoAgent")
         resource_keys = {
             item["key"]
@@ -105,6 +116,156 @@ class StampTest(unittest.TestCase):
         self.assertFalse(
             any(key.startswith("honeyhive_inputs") for key in span_attrs)
         )
+
+
+class IoRewriteTest(unittest.TestCase):
+    def test_llm_kvlist_becomes_genai_json_strings(self) -> None:
+        payload = _payload(
+            "off_topic",
+            [
+                {"key": "step.type", "value": {"stringValue": "LLM_STEP"}},
+                {
+                    "key": "input.value",
+                    "value": {
+                        "kvlistValue": {
+                            "gen_ai.request.model": "llmgateway__GPT41",
+                            "gen_ai.input.messages": [
+                                {"role": "system", "content": "You are an AI Agent."},
+                                {
+                                    "role": "user",
+                                    "content": "What else can you do?",
+                                },
+                            ],
+                        }
+                    },
+                },
+                {
+                    "key": "output.value",
+                    "value": {
+                        "kvlistValue": {
+                            "gen_ai.output.messages": (
+                                "I am here to help with AI-powered searches."
+                            )
+                        }
+                    },
+                },
+            ],
+        )
+        stamp_and_map(payload, "5fd03ee0-c76d-4d57-9ed4-d43556ab8e73", "DemoAgent")
+        strings = _span_attr_strings(payload)
+        self.assertEqual(
+            json.loads(strings["gen_ai.input.messages"]),
+            [
+                {"role": "system", "content": "You are an AI Agent."},
+                {"role": "user", "content": "What else can you do?"},
+            ],
+        )
+        self.assertEqual(
+            json.loads(strings["gen_ai.output.messages"]),
+            [
+                {
+                    "role": "assistant",
+                    "content": "I am here to help with AI-powered searches.",
+                }
+            ],
+        )
+        self.assertEqual(
+            json.loads(strings["input.value"])["messages"][1]["content"],
+            "What else can you do?",
+        )
+        self.assertEqual(json.loads(strings["output.value"])["content"], "I am here to help with AI-powered searches.")
+        self.assertEqual(strings["gen_ai.request.model"], "llmgateway__GPT41")
+        keys = set(strings)
+        self.assertNotIn("honeyhive_event_type", keys)
+        self.assertFalse(any(key.startswith("honeyhive_inputs") for key in keys))
+
+    def test_turn_agent_messages_become_genai_json_strings(self) -> None:
+        payload = _payload(
+            "GeneralFAQ",
+            [
+                {
+                    "key": "agent.messages.user.0.content",
+                    "value": {"stringValue": "What is your purpose?"},
+                },
+                {
+                    "key": "agent.messages.assistant.1.content",
+                    "value": {
+                        "stringValue": "I&#39;m here to search knowledge articles."
+                    },
+                },
+            ],
+        )
+        stamp_and_map(payload, "5fd03ee0-c76d-4d57-9ed4-d43556ab8e73", "DemoAgent")
+        strings = _span_attr_strings(payload)
+        self.assertEqual(
+            json.loads(strings["gen_ai.input.messages"]),
+            [
+                {"role": "user", "content": "What is your purpose?"},
+                {
+                    "role": "assistant",
+                    "content": "I'm here to search knowledge articles.",
+                },
+            ],
+        )
+        self.assertEqual(
+            json.loads(strings["gen_ai.output.messages"])[0]["content"],
+            "I'm here to search knowledge articles.",
+        )
+        # Chain turns keep messages on gen_ai.*.messages, not input.value.
+        self.assertNotIn("input.value", strings)
+        self.assertNotIn("output.value", strings)
+
+    def test_classifier_uses_classifier_input_and_selected_target(self) -> None:
+        payload = _payload(
+            "pre_orchestration.guardrail",
+            [
+                {"key": "step.type", "value": {"stringValue": "CLASSIFIER_STEP"}},
+                {
+                    "key": "input.value",
+                    "value": {
+                        "kvlistValue": {
+                            "classifier.input": "What else can you do?",
+                        }
+                    },
+                },
+                {
+                    "key": "output.value",
+                    "value": {
+                        "kvlistValue": {
+                            "af.router_classifier.selected_target": "Miscellaneous_Category"
+                        }
+                    },
+                },
+            ],
+        )
+        stamp_and_map(payload, "5fd03ee0-c76d-4d57-9ed4-d43556ab8e73", "DemoAgent")
+        strings = _span_attr_strings(payload)
+        self.assertEqual(
+            json.loads(strings["gen_ai.input.messages"]),
+            [{"role": "user", "content": "What else can you do?"}],
+        )
+        self.assertEqual(
+            json.loads(strings["gen_ai.output.messages"])[0]["content"],
+            "Miscellaneous_Category",
+        )
+        self.assertEqual(strings["openinference.span.kind"], "LLM")
+
+    def test_state_update_stays_empty(self) -> None:
+        payload = _payload(
+            "__state_update_action__",
+            [
+                {
+                    "key": "step.type",
+                    "value": {"stringValue": "VARIABLE_UPDATE_STEP"},
+                },
+                {"key": "step.id", "value": {"stringValue": "abc"}},
+            ],
+        )
+        stamp_and_map(payload, "5fd03ee0-c76d-4d57-9ed4-d43556ab8e73", "DemoAgent")
+        strings = _span_attr_strings(payload)
+        self.assertNotIn("gen_ai.input.messages", strings)
+        self.assertNotIn("gen_ai.output.messages", strings)
+        self.assertEqual(strings["openinference.span.kind"], "TOOL")
 
 
 if __name__ == "__main__":

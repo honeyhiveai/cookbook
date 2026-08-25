@@ -4,7 +4,7 @@ Poll [Salesforce Agentforce](https://www.salesforce.com/agentforce/) [Session Tr
 
 Agentforce does not push OpenTelemetry to an external endpoint. This cookbook is a beta reference poller (Python standard library only). Copy it and run it wherever you want.
 
-One Agentforce conversation becomes one HoneyHive session with turn, model, and tool events.
+One Agentforce conversation becomes one HoneyHive session. Session Trace exports the full Agentforce graph, so one user turn is several events (the turn itself, a state update, a guardrail, a topic router, the topic LLM call, and an instruction check). The poller rewrites Salesforce kvlists and `agent.messages.*` keys into GenAI / OpenInference JSON strings so HoneyHive Input/Output panels fill in.
 
 ## Prerequisites
 
@@ -79,9 +79,9 @@ set +a
 SALESFORCE_SESSION_ID=<salesforce-id-from-a-would-export-line> python3 poll_agentforce.py
 ```
 
-On success the script prints `Exported N span(s) for <salesforce-id> as <honeyhive-uuid>`. Open [Traces > Sessions](https://app.us.honeyhive.ai/traces/sessions) and match the **HoneyHive UUID** (it is derived from the Salesforce id, not equal to it). A first export of `N` spans shows `N + 1` events because HoneyHive adds the session row.
+On success the script prints `Exported N span(s) for <salesforce-id> as <honeyhive-uuid>`. Open [Traces > Sessions](https://app.us.honeyhive.ai/traces/sessions) and match the **HoneyHive UUID** (it is derived from the Salesforce id, not equal to it). A first export of `N` spans shows `N + 1` events because HoneyHive adds the session row. Use **All time** if the conversation is older than the default range.
 
-Exported IDs are stored in `.agentforce-exported.json` so a later run does not POST the same session again.
+Exported IDs are stored in `.agentforce-exported.json` so a later run does not POST the same session again. Pinning `SALESFORCE_SESSION_ID` still POSTs. Re-exporting the same Salesforce session appends spans onto the same HoneyHive session. Set `HONEYHIVE_SESSION_ID` to a new UUID if you want a fresh tree.
 
 ## Run it again
 
@@ -109,6 +109,7 @@ Salesforce documents a 72-hour export window. Sessions older than that are gone.
 | `SALESFORCE_CLIENT_SECRET` | Yes | External Client App consumer secret |
 | `DRY_RUN` | No | `1` fetches without POSTing |
 | `SALESFORCE_SESSION_ID` | No | Export this session only |
+| `HONEYHIVE_SESSION_ID` | No | Override the derived HoneyHive session UUID. Must be a UUID |
 | `MAX_PASSES` | No | Stop after this many loops (default `1`). `0` loops until interrupted |
 | `POLL_INTERVAL` | No | Seconds between loops when `MAX_PASSES=0` (default `60`) |
 
@@ -117,7 +118,7 @@ Salesforce documents a 72-hour export window. Sessions older than that are gone.
 | File | Purpose |
 | --- | --- |
 | [`poll_agentforce.py`](./poll_agentforce.py) | Discover, fetch, map, POST |
-| [`otel_map.py`](./otel_map.py) | Public session grouping and OpenInference span kind |
+| [`otel_map.py`](./otel_map.py) | Session grouping, span kind, and I/O rewrite onto public GenAI / OpenInference JSON strings |
 | [`poller.env.example`](./poller.env.example) | Copy to `poller.env` |
 
 ## Links

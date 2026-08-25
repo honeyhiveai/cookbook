@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import os
 import time
+import uuid
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -40,6 +41,16 @@ def env(name: str) -> str:
 
 def dry_run() -> bool:
     return os.environ.get("DRY_RUN", "").strip().lower() in ("1", "true", "yes")
+
+
+def resolved_session_id(sf_session_id: str) -> str:
+    override = os.environ.get("HONEYHIVE_SESSION_ID", "").strip()
+    if not override:
+        return honeyhive_session_id(sf_session_id)
+    try:
+        return str(uuid.UUID(override))
+    except ValueError:
+        raise SystemExit("HONEYHIVE_SESSION_ID must be a UUID") from None
 
 
 def http_json(method: str, url: str, headers: dict, data=None, form: bool = False):
@@ -233,7 +244,7 @@ def process_session(
             return False
         print(f"Skip {session_id}: {reason}")
         return False
-    hh_session = honeyhive_session_id(session_id)
+    hh_session = resolved_session_id(session_id)
     stamp_and_map(payload, hh_session, session_name_for(payload, None))
     if preview:
         print(

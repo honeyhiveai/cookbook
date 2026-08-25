@@ -1,10 +1,14 @@
-"""Behavior specs for discovery SOQL and skip decisions."""
+"""Behavior specs for discovery SOQL, skip decisions, and session id override."""
 
 from __future__ import annotations
 
+import os
 import unittest
+import uuid
+from unittest.mock import patch
 
-from poll_agentforce import discovery_soql, skip_reason
+from otel_map import honeyhive_session_id
+from poll_agentforce import discovery_soql, resolved_session_id, skip_reason
 
 
 class DiscoverySoqlTest(unittest.TestCase):
@@ -28,6 +32,18 @@ class SkipReasonTest(unittest.TestCase):
 
     def test_complete_with_spans_exports(self) -> None:
         self.assertIsNone(skip_reason(complete=True, count=20))
+
+
+class ResolvedSessionIdTest(unittest.TestCase):
+    def test_default_is_uuid5(self) -> None:
+        sid = "01a02190-7c5e-74ee-b4a8-eff86af959e7"
+        with patch.dict(os.environ, {"HONEYHIVE_SESSION_ID": ""}):
+            self.assertEqual(resolved_session_id(sid), honeyhive_session_id(sid))
+
+    def test_override_must_be_uuid(self) -> None:
+        override = str(uuid.uuid4())
+        with patch.dict(os.environ, {"HONEYHIVE_SESSION_ID": override}):
+            self.assertEqual(resolved_session_id("ignored"), override)
 
 
 if __name__ == "__main__":
