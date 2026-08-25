@@ -118,7 +118,7 @@ Salesforce documents a 72-hour export window. Conversations older than that are 
 | File | Purpose |
 | --- | --- |
 | [`poll_agentforce.py`](./poll_agentforce.py) | Discover, fetch, map, POST |
-| [`otel_map.py`](./otel_map.py) | Session grouping and I/O rewrite onto public GenAI JSON strings |
+| [`otel_map.py`](./otel_map.py) | Session grouping and I/O rewrite onto `gen_ai.input.messages` / `gen_ai.output.messages` |
 | [`poller.env.example`](./poller.env.example) | Copy to `poller.env` |
 
 ## Links

@@ -1,4 +1,4 @@
-"""Behavior specs for public session grouping, span kind, and I/O rewrite."""
+"""Behavior specs for public session grouping, GenAI I/O rewrite, and operation name."""
 
 from __future__ import annotations
 
@@ -9,7 +9,8 @@ import uuid
 from otel_map import (
     attr,
     honeyhive_session_id,
-    openinference_span_kind,
+    operation_name,
+    span_kind,
     stamp_and_map,
 )
 
@@ -49,25 +50,25 @@ class SessionIdTest(unittest.TestCase):
 
 
 class SpanKindTest(unittest.TestCase):
-    def test_llm_step_is_llm(self) -> None:
+    def test_llm_step_is_chat(self) -> None:
         self.assertEqual(
-            openinference_span_kind({"name": "chat"}, {"step.type": "LLM_STEP"}),
+            span_kind({"name": "chat"}, {"step.type": "LLM_STEP"}),
             "LLM",
         )
+        self.assertEqual(operation_name("LLM"), "chat")
 
-    def test_state_update_is_tool(self) -> None:
+    def test_state_update_is_execute_tool(self) -> None:
         self.assertEqual(
-            openinference_span_kind(
+            span_kind(
                 {"name": "__state_update_action__"}, {"step.type": "VARIABLE_UPDATE_STEP"}
             ),
             "TOOL",
         )
+        self.assertEqual(operation_name("TOOL"), "execute_tool")
 
-    def test_turn_is_chain(self) -> None:
-        self.assertEqual(
-            openinference_span_kind({"name": "GeneralFAQ"}, {}),
-            "CHAIN",
-        )
+    def test_turn_is_invoke_agent(self) -> None:
+        self.assertEqual(span_kind({"name": "GeneralFAQ"}, {}), "CHAIN")
+        self.assertEqual(operation_name("CHAIN"), "invoke_agent")
 
 
 class AttrEncodingTest(unittest.TestCase):
@@ -80,7 +81,7 @@ class AttrEncodingTest(unittest.TestCase):
 
 
 class StampTest(unittest.TestCase):
-    def test_stamps_public_session_and_kind_only(self) -> None:
+    def test_stamps_public_session_and_operation_name(self) -> None:
         payload = _payload(
             "chat",
             [
@@ -104,7 +105,8 @@ class StampTest(unittest.TestCase):
         self.assertIn("honeyhive.session_name", resource_keys)
         self.assertIn("gen_ai.conversation.id", resource_keys)
         self.assertIn("gen_ai.agent.name", resource_keys)
-        self.assertEqual(span_attrs["openinference.span.kind"]["stringValue"], "LLM")
+        self.assertEqual(span_attrs["gen_ai.operation.name"]["stringValue"], "chat")
+        self.assertNotIn("openinference.span.kind", span_attrs)
         self.assertEqual(
             span_attrs["gen_ai.request.model"]["stringValue"], "gpt-4o"
         )
@@ -169,11 +171,9 @@ class IoRewriteTest(unittest.TestCase):
                 }
             ],
         )
-        self.assertEqual(
-            json.loads(strings["input.value"])["messages"][1]["content"],
-            "What else can you do?",
-        )
-        self.assertEqual(json.loads(strings["output.value"])["content"], "I am here to help with AI-powered searches.")
+        self.assertNotIn("input.value", strings)
+        self.assertNotIn("output.value", strings)
+        self.assertEqual(strings["gen_ai.operation.name"], "chat")
         self.assertEqual(strings["gen_ai.request.model"], "llmgateway__GPT41")
         keys = set(strings)
         self.assertNotIn("honeyhive_event_type", keys)
@@ -211,9 +211,10 @@ class IoRewriteTest(unittest.TestCase):
             json.loads(strings["gen_ai.output.messages"])[0]["content"],
             "I'm here to search knowledge articles.",
         )
-        # Chain turns keep messages on gen_ai.*.messages, not input.value.
+        self.assertEqual(strings["gen_ai.operation.name"], "invoke_agent")
         self.assertNotIn("input.value", strings)
         self.assertNotIn("output.value", strings)
+        self.assertNotIn("openinference.span.kind", strings)
 
     def test_classifier_uses_classifier_input_and_selected_target(self) -> None:
         payload = _payload(
@@ -248,7 +249,10 @@ class IoRewriteTest(unittest.TestCase):
             json.loads(strings["gen_ai.output.messages"])[0]["content"],
             "Miscellaneous_Category",
         )
-        self.assertEqual(strings["openinference.span.kind"], "LLM")
+        self.assertEqual(strings["gen_ai.operation.name"], "chat")
+        self.assertNotIn("input.value", strings)
+        self.assertNotIn("output.value", strings)
+        self.assertNotIn("openinference.span.kind", strings)
 
     def test_state_update_stays_empty(self) -> None:
         payload = _payload(
@@ -265,7 +269,8 @@ class IoRewriteTest(unittest.TestCase):
         strings = _span_attr_strings(payload)
         self.assertNotIn("gen_ai.input.messages", strings)
         self.assertNotIn("gen_ai.output.messages", strings)
-        self.assertEqual(strings["openinference.span.kind"], "TOOL")
+        self.assertEqual(strings["gen_ai.operation.name"], "execute_tool")
+        self.assertNotIn("openinference.span.kind", strings)
 
     def test_guardrail_without_messages_drops_leftover_input(self) -> None:
         payload = _payload(
@@ -293,6 +298,8 @@ class IoRewriteTest(unittest.TestCase):
         strings = _span_attr_strings(payload)
         self.assertNotIn("gen_ai.input.messages", strings)
         self.assertNotIn("input.value", strings)
+        self.assertNotIn("output.value", strings)
+        self.assertEqual(strings["gen_ai.operation.name"], "chat")
         self.assertEqual(
             json.loads(strings["gen_ai.output.messages"])[0]["content"],
             "InstructionAdherence: value=HIGH",

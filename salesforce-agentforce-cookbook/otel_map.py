@@ -1,16 +1,16 @@
-"""Stamp public OTel / OpenInference attributes onto Salesforce Session Trace OTel.
+"""Stamp public GenAI session attributes onto Salesforce Session Trace OTel.
 
 Salesforce Session Trace does not emit HoneyHive-ready I/O. Turn spans use dotted
 `agent.messages.{role}.{n}.content` keys. Step spans put I/O in a non-standard
 `input.value` / `output.value` kvlist object map, sometimes with nested
-`gen_ai.input.messages`. This module groups one conversation as one session,
-sets an OpenInference span kind, and rewrites I/O onto GenAI / OpenInference
-JSON strings.
+`gen_ai.input.messages`. This module groups one conversation as one session
+and rewrites I/O onto `gen_ai.input.messages` / `gen_ai.output.messages` JSON
+strings. It stamps `gen_ai.operation.name` so HoneyHive reads those GenAI
+strings. It does not stamp OpenInference I/O or `openinference.span.kind`.
 
 Public contract:
 https://docs.honeyhive.ai/v2/sdk-reference/semconv-alignment
 https://opentelemetry.io/docs/specs/semconv/gen-ai/
-https://github.com/Arize-ai/openinference/blob/main/spec/semantic_conventions.md
 """
 
 from __future__ import annotations
@@ -281,35 +281,24 @@ def drop_keys(items: list, keys: set[str]) -> None:
 
 
 def rewrite_io(items: list, attrs: dict, kind: str) -> None:
-    # CHAIN (turn) spans must not get OpenInference input.value. HoneyHive keeps
-    # that attribute as a raw string on chain events, which hides the messages.
+    # Drop leftover Salesforce kvlists after extracting messages. HoneyHive
+    # Input/Output panels read the GenAI JSON strings this function writes.
     chat_history, outputs, model = map_io(attrs)
+    drop_keys(items, {"input.value", "output.value"})
     if kind == "TOOL":
-        drop_keys(items, {"input.value", "output.value"})
         return
     if chat_history:
         replace_or_add(items, "gen_ai.input.messages", json.dumps(chat_history, default=str))
-        if kind == "LLM":
-            payload: dict = {"messages": chat_history}
-            if model:
-                payload["model"] = model
-            replace_or_add(items, "input.value", json.dumps(payload, default=str))
-    else:
-        drop_keys(items, {"input.value"})
     if outputs.get("content"):
         out_messages = [
             {"role": outputs.get("role") or "assistant", "content": outputs["content"]}
         ]
         replace_or_add(items, "gen_ai.output.messages", json.dumps(out_messages, default=str))
-        if kind == "LLM":
-            replace_or_add(items, "output.value", json.dumps(outputs, default=str))
-    else:
-        drop_keys(items, {"output.value"})
     if model:
         replace_or_add(items, "gen_ai.request.model", model)
 
 
-def openinference_span_kind(span: dict, attrs: dict) -> str:
+def span_kind(span: dict, attrs: dict) -> str:
     step_type = str(attrs.get("step.type") or "")
     name = span.get("name") or ""
     if step_type in LLM_STEPS or name in LLM_NAMES:
@@ -317,6 +306,14 @@ def openinference_span_kind(span: dict, attrs: dict) -> str:
     if name == "__state_update_action__" or step_type in TOOL_STEPS:
         return "TOOL"
     return "CHAIN"
+
+
+def operation_name(kind: str) -> str:
+    if kind == "LLM":
+        return "chat"
+    if kind == "TOOL":
+        return "execute_tool"
+    return "invoke_agent"
 
 
 def _resource_attrs(resource: dict) -> list:
@@ -363,8 +360,8 @@ def stamp_and_map(payload: dict, hh_session_id: str, session_name: str) -> None:
                 replace_or_add(items, "gen_ai.conversation.id", hh_session_id)
                 if session_name:
                     replace_or_add(items, "honeyhive.session_name", session_name)
-                kind = openinference_span_kind(span, decoded)
-                replace_or_add(items, "openinference.span.kind", kind)
+                kind = span_kind(span, decoded)
+                replace_or_add(items, "gen_ai.operation.name", operation_name(kind))
                 rewrite_io(items, decoded, kind)
 
 
