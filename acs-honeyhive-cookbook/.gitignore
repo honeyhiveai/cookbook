@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+# OPA binary downloaded by scripts/setup_opa.sh
+opa
+bin/opa

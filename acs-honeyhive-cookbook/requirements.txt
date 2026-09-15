@@ -1,0 +1,4 @@
+agent-control-specification==0.3.1b0
+honeyhive[openinference-openai]>=1.2.1
+openai>=1.0.0
+python-dotenv>=1.0.0
