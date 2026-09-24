@@ -1,0 +1,20 @@
+{
+  "name": "cross-customer-data-access",
+  "type": "PYTHON",
+  "criteria_file": "cross_customer_data_access.py",
+  "entrypoint": "cross_customer_data_access",
+  "return_type": "boolean",
+  "description": "Fires when a tool returned a customer record whose owner differs from the authenticated customer for the session. Detects horizontal privilege escalation / IDOR in the banking agent.\n",
+  "enabled_in_prod": true,
+  "sampling_percentage": 100,
+  "filters": {
+    "filterArray": [
+      {
+        "field": "metadata.access_check",
+        "operator": "is",
+        "value": true,
+        "type": "boolean"
+      }
+    ]
+  }
+}
