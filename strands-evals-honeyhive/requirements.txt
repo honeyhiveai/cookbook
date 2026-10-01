@@ -1,0 +1,5 @@
+strands-agents[openai]>=1.45.0
+strands-agents-evals>=1.4.0
+httpx>=0.27
+python-dotenv>=1.0
+pytest>=8.0
