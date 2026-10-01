@@ -1,0 +1,32 @@
+{
+  "name": "strands-ts-offline-evals",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Run offline experiments on a Strands TypeScript agent with HoneyHive",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@honeyhive/api-client": "^1.5.0",
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.219.0",
+    "@opentelemetry/sdk-trace-base": "^2.6.1",
+    "@opentelemetry/sdk-trace-node": "^2.6.1",
+    "@strands-agents/sdk": "^1.19.0",
+    "dotenv": "^17.0.0",
+    "openai": "^6.45.0",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.8",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
+}
