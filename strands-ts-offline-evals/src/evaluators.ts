@@ -6,8 +6,13 @@ export interface EvaluatorArgs {
   readonly output: string
 }
 
-/** A score for one datapoint. HoneyHive aggregates numbers and booleans across the run. */
-export type Evaluator = (args: EvaluatorArgs) => Promise<number | boolean> | number | boolean
+/**
+ * A score for one datapoint. HoneyHive aggregates numbers and booleans across the run.
+ * Return undefined to skip the metric for a datapoint, for example when it has no reference answer.
+ */
+export type Evaluator = (
+  args: EvaluatorArgs,
+) => Promise<number | boolean | undefined> | number | boolean | undefined
 
 const openai = new OpenAI()
 
@@ -17,7 +22,7 @@ const openai = new OpenAI()
  */
 export const correctness: Evaluator = async ({ datapoint, output }) => {
   const reference = datapoint.ground_truth?.answer
-  if (typeof reference !== 'string') return false
+  if (typeof reference !== 'string') return undefined
 
   const response = await openai.chat.completions.create({
     model: 'gpt-4.1-mini',
@@ -41,4 +46,4 @@ export const correctness: Evaluator = async ({ datapoint, output }) => {
 }
 
 /** Deterministic check that the answer stays within the system prompt's two-sentence limit. */
-export const concise: Evaluator = ({ output }) => output.split(/[.!?](\s|$)/).filter((s) => s.trim()).length <= 2
+export const concise: Evaluator = ({ output }) => output.split(/[.!?](?:\s|$)/).filter((s) => s.trim()).length <= 2

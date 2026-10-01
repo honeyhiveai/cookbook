@@ -26,7 +26,7 @@ class HoneyHiveSessionPropagator implements SpanProcessor {
 
 /**
  * Registers a global tracer provider that exports Strands spans to HoneyHive over OTLP/HTTP.
- * Import this module before the Strands SDK so the agent picks up this provider.
+ * Call it before the first Agent is constructed, so the agent's tracer resolves to this provider.
  */
 export function setupTracing(apiKey: string, dataPlaneUrl: string): NodeTracerProvider {
   const provider = new NodeTracerProvider({

@@ -35,17 +35,29 @@ def main(session_ids: list[str]) -> None:
 
     # Each report row is one (case, evaluator) pair. Collect the scores per session.
     scores: dict[str, dict[str, float | str]] = {sid: {} for sid in session_ids}
-    for row, score, reason in zip(report.cases, report.scores, report.reasons, strict=True):
+    rows = zip(report.cases, report.scores, report.reasons, report.detailed_results, strict=True)
+    for row, score, reason, detail in rows:
+        if not detail:
+            # Strands Evals reports a failed fetch as a score of 0 with no detailed results.
+            # Writing that 0 back would record a verdict that no judge made.
+            print(f"{row['name']}: skipped {row['evaluator']} ({reason})", file=sys.stderr)
+            continue
         metric = f"strands.{row['evaluator']}"
         scores[row["name"]][metric] = score
         scores[row["name"]][f"{metric}_explanation"] = reason
 
-    api_url = os.environ.get("HH_API_URL", "https://api.dp1.us.prod.honeyhive.ai").rstrip("/")
+    api_url = os.environ.get("HH_API_URL", "https://api.dp1.us.honeyhive.ai").rstrip("/")
     headers = {"Authorization": f"Bearer {os.environ['HH_API_KEY']}"}
     with httpx.Client(base_url=api_url, headers=headers, timeout=30) as client:
         for session_id, metrics in scores.items():
+            if not metrics:
+                continue
             # The session event ID is the session ID. HoneyHive merges these keys into existing metrics.
-            client.put(f"/v1/events/{session_id}", json={"metrics": metrics}).raise_for_status()
+            try:
+                client.put(f"/v1/events/{session_id}", json={"metrics": metrics}).raise_for_status()
+            except httpx.HTTPError as e:
+                print(f"{session_id}: could not write scores ({e})", file=sys.stderr)
+                continue
             print(session_id, {k: v for k, v in metrics.items() if not k.endswith("_explanation")})
 
 

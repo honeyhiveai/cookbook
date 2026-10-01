@@ -123,7 +123,7 @@ def test_requests_session_events_with_filter() -> None:
 
     _provider(events, requests).get_evaluation_data(session_id)
 
-    assert requests[0]["path"] == "/v1/events/export"
+    assert requests[0]["path"] == "/v1/events/search"
     assert requests[0]["auth"] == "Bearer test-key"
     assert requests[0]["body"]["filters"] == [
         {"field": "session_id", "operator": "is", "value": session_id, "type": "string"}
@@ -163,10 +163,55 @@ def test_http_error_raises_provider_error() -> None:
         HoneyHiveProvider(api_key="bad", client=client).get_evaluation_data("any")
 
 
-def test_requires_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_non_json_response_raises_provider_error() -> None:
+    client = httpx.Client(
+        base_url="https://api.example.test",
+        transport=httpx.MockTransport(lambda request: httpx.Response(200, text="<html>proxy error</html>")),
+    )
+    with pytest.raises(ProviderError):
+        HoneyHiveProvider(client=client).get_evaluation_data("any")
+
+
+def test_non_object_response_raises_provider_error() -> None:
+    client = httpx.Client(
+        base_url="https://api.example.test",
+        transport=httpx.MockTransport(lambda request: httpx.Response(200, json=[])),
+    )
+    with pytest.raises(ProviderError):
+        HoneyHiveProvider(client=client).get_evaluation_data("any")
+
+
+def test_retries_timeouts() -> None:
+    calls = {"n": 0}
+    events = _load("strands_ts_session.json")
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise httpx.ReadTimeout("slow", request=request)
+        return httpx.Response(200, json={"events": events})
+
+    client = httpx.Client(base_url="https://api.example.test", transport=httpx.MockTransport(handler))
+    data = HoneyHiveProvider(client=client).get_evaluation_data(events[0]["session_id"])
+
+    assert calls["n"] == 2
+    assert data["output"] == "25 multiplied by 4 is 100."
+
+
+def test_requires_api_key_without_client(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("HH_API_KEY", raising=False)
     with pytest.raises(ProviderError):
         HoneyHiveProvider()
+
+
+def test_event_without_start_time_is_skipped() -> None:
+    events = _load("strands_ts_session.json")
+    tool = next(e for e in events if e["event_name"].startswith("execute_tool"))
+    tool["start_time"] = None
+
+    data = _provider(events).get_evaluation_data(events[0]["session_id"])
+
+    assert not any(isinstance(s, ToolExecutionSpan) for s in data["trajectory"].traces[0].spans)
 
 
 def test_malformed_event_is_skipped() -> None:

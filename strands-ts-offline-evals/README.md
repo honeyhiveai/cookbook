@@ -27,7 +27,7 @@ for each datapoint:
 experiments.createRun before the loop, experiments.updateRun (status: completed) after it
 ```
 
-This is the same contract that the HoneyHive Python SDK's `evaluate()` uses, so runs from this cookbook show up in HoneyHive the same way as Python experiment runs.
+This links runs, sessions, and datapoints the same way as the HoneyHive Python SDK's `evaluate()`. One difference: this cookbook puts evaluator scores on the session event, and `evaluate()` puts them on the function's span.
 
 | File | What it does |
 | --- | --- |
@@ -42,9 +42,9 @@ This is the same contract that the HoneyHive Python SDK's `evaluate()` uses, so 
 
 | Requirement | Where to get it |
 | --- | --- |
-| Node.js 20+ | [nodejs.org](https://nodejs.org) |
+| Node.js 22+ | [nodejs.org](https://nodejs.org). The Strands TypeScript SDK requires Node.js 22. |
 | pnpm | [pnpm.io/installation](https://pnpm.io/installation) |
-| HoneyHive API key | [HoneyHive dashboard](https://app.honeyhive.ai), under your project's API keys |
+| HoneyHive project API key (`hh_...`) | In HoneyHive, **Settings > Project > API Keys**, **Project** tab. An ingestion key does not work, because the experiments API rejects it. |
 | OpenAI API key | [platform.openai.com/api-keys](https://platform.openai.com/api-keys). Used by the agent and the LLM judge. |
 
 ## Setup
@@ -65,8 +65,8 @@ OPENAI_API_KEY=your_openai_api_key
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
 | `HH_PROJECT_API_KEY` | Yes | | HoneyHive project API key. Used for the OTLP export and for the experiments API. |
-| `HH_DATA_PLANE_URL` | No | `https://api.dp1.us.prod.honeyhive.ai` | HoneyHive API host. Change it for dedicated or self-hosted deployments. |
 | `OPENAI_API_KEY` | Yes | | Key for the agent's model and for the LLM judge. |
+| `HH_DATA_PLANE_URL` | No | `https://api.dp1.us.honeyhive.ai` | HoneyHive API host. Change it for dedicated or self-hosted deployments. |
 | `HH_APP_URL` | No | `https://app.us.honeyhive.ai` | HoneyHive app URL for the printed run link. Change it for dedicated or self-hosted deployments. |
 | `HH_DATASET_ID` | No | | Run against a HoneyHive dataset instead of the inline dataset. Each datapoint needs `inputs.question` and `ground_truth.answer`. |
 
@@ -76,7 +76,15 @@ OPENAI_API_KEY=your_openai_api_key
 pnpm start
 ```
 
-The script prints a link to the run. Open it to see each datapoint's scores, and select a row to see that datapoint's trace.
+The script prints a summary line, a link to the run, and the session IDs:
+
+```
+Ran 3 datapoints, 0 failed.
+Results: https://app.us.honeyhive.ai/p/<project-id>/experiments/runs/<run-id>
+Session IDs: <session-id> <session-id> <session-id>
+```
+
+Open the link to see each datapoint's scores, and select a row to see that datapoint's trace. To score the same sessions with Strands Evals evaluators, pass the session IDs to [strands-evals-honeyhive](../strands-evals-honeyhive).
 
 To check types without running the experiment:
 
@@ -97,6 +105,8 @@ To use a different model provider, replace `OpenAIModel` with another Strands mo
 **Each span appears in its own session.** The agent is missing `traceAttributes: { 'honeyhive.session_id': sessionId }`, or `src/tracing.ts` is not registered. `setupTracing()` must run before the first agent call.
 
 **The run page shows no scores right after the run.** HoneyHive indexes sessions after they arrive, so results can trail the run by a few minutes. Refresh the page. To read the results in code, call `client.experiments.getSummary({ run_id })`.
+
+**A datapoint failed.** The session keeps the error in `metadata.error` and has no scores, and the run's `metadata.failed_datapoints` counts it. If an evaluator throws, the other evaluators still score that datapoint. If anything else throws, the run is marked `failed`.
 
 **Spans are missing from a session.** The process exited before the exporter flushed. `runExperiment()` calls `flush()` before it closes the run, and `index.ts` calls `provider.shutdown()` at the end. Keep both if you change the entry point.
 

@@ -55,8 +55,14 @@ export async function loadHoneyHiveDataset(client: Client, datasetId: string): P
 
   const datapoints: Datapoint[] = []
   for (const datapointId of dataset.datapoints ?? []) {
-    const { datapoint } = await client.datapoints.get({ datapoint_id: datapointId })
-    const point = datapoint[0]
+    let point
+    try {
+      point = (await client.datapoints.get({ datapoint_id: datapointId })).datapoint[0]
+    } catch (error) {
+      // Skip a datapoint that fails to load, as the Python SDK does. The load fails only if none load.
+      console.warn(`Skipping datapoint ${datapointId}: ${error instanceof Error ? error.message : String(error)}`)
+      continue
+    }
     if (!point) continue
     datapoints.push({
       id: datapointId,

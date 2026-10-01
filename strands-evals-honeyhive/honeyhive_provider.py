@@ -7,7 +7,7 @@ import logging
 import os
 from collections import defaultdict
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, cast
 
 import httpx
 from strands_evals.providers.exceptions import ProviderError, SessionNotFoundError
@@ -29,24 +29,27 @@ from strands_evals.types.trace import (
     Trace,
     UserMessage,
 )
+from tenacity import Retrying, before_sleep_log, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 logger = logging.getLogger(__name__)
 
 __all__ = ["HoneyHiveProvider"]
 
-_DEFAULT_API_URL = "https://api.dp1.us.prod.honeyhive.ai"
+_DEFAULT_API_URL = "https://api.dp1.us.honeyhive.ai"
 _DEFAULT_TIMEOUT = 60.0
-# The export endpoint returns at most this many events per page.
+# The search endpoint caps `limit` at 1000.
 _PAGE_SIZE = 1000
+_MAX_RETRIES = 3
 
 
 class HoneyHiveProvider(TraceProvider):
     """Retrieves agent sessions from HoneyHive for evaluation.
 
     HoneyHive stores each OpenTelemetry span as an event in a session. This provider
-    fetches a session's events with the HoneyHive events API and converts the Strands
+    fetches a session's events with the HoneyHive events search API and converts the Strands
     spans (``invoke_agent``, ``chat``, ``execute_tool``) to Strands Evals span types.
     It works for agents written with the Strands Python SDK and the Strands TypeScript SDK.
+    Use a HoneyHive project API key.
 
     Example::
 
@@ -71,6 +74,7 @@ class HoneyHiveProvider(TraceProvider):
 
         Args:
             api_key: HoneyHive project API key. Falls back to the HH_API_KEY environment variable.
+                Ignored when ``client`` is passed.
             api_url: HoneyHive data plane URL. Falls back to the HH_API_URL environment variable,
                 then to the HoneyHive cloud URL.
             timeout: Request timeout in seconds.
@@ -78,13 +82,16 @@ class HoneyHiveProvider(TraceProvider):
                 mock transport.
 
         Raises:
-            ProviderError: If no API key can be resolved.
+            ProviderError: If no client is passed and no API key can be resolved.
         """
+        if client is not None:
+            self._client = client
+            return
         resolved_key = api_key or os.environ.get("HH_API_KEY")
         if not resolved_key:
             raise ProviderError("HoneyHive API key required. Provide api_key or set HH_API_KEY.")
         resolved_url = (api_url or os.environ.get("HH_API_URL") or _DEFAULT_API_URL).rstrip("/")
-        self._client = client or httpx.Client(
+        self._client = httpx.Client(
             base_url=resolved_url,
             headers={"Authorization": f"Bearer {resolved_key}"},
             timeout=timeout,
@@ -115,15 +122,31 @@ class HoneyHiveProvider(TraceProvider):
                 "page": page,
             }
             try:
-                response = self._client.post("/v1/events/export", json=body)
-                response.raise_for_status()
-            except httpx.HTTPError as e:
+                payload = self._post_with_retry("/v1/events/search", body)
+            except (httpx.HTTPError, ValueError) as e:
                 raise ProviderError(f"HoneyHive: failed to fetch events for session '{session_id}': {e}") from e
-            batch = response.json().get("events") or []
+            batch = payload.get("events") or []
             events.extend(batch)
             if len(batch) < _PAGE_SIZE:
                 return events
             page += 1
+
+    def _post_with_retry(self, path: str, body: dict[str, Any]) -> dict[str, Any]:
+        """POST and return the JSON body. Retries timeouts, which a large session can hit."""
+        for attempt in Retrying(
+            retry=retry_if_exception_type(httpx.TimeoutException),
+            stop=stop_after_attempt(_MAX_RETRIES),
+            wait=wait_exponential(multiplier=1, max=10),
+            before_sleep=before_sleep_log(logger, logging.WARNING),
+            reraise=True,
+        ):
+            with attempt:
+                response = self._client.post(path, json=body)
+                response.raise_for_status()
+                payload = response.json()
+        if not isinstance(payload, dict):
+            raise ProviderError(f"HoneyHive: expected a JSON object from {path}, got {type(payload).__name__}")
+        return payload
 
     # --- Assembly ---
 
@@ -166,7 +189,7 @@ class HoneyHiveProvider(TraceProvider):
         Strands names its spans the same way in Python and TypeScript:
 
             invoke_agent <name>        → AgentInvocationSpan
-            chat (event_type "model")  → InferenceSpan
+            model event (``chat``)      → InferenceSpan
             execute_tool <name>        → ToolExecutionSpan
 
         Event loop cycle spans carry no information the evaluators use, so they are skipped.
@@ -270,10 +293,14 @@ class HoneyHiveProvider(TraceProvider):
 
 
 def _to_datetime(value: Any) -> datetime:
-    """HoneyHive stores start and end times as Unix milliseconds."""
+    """HoneyHive stores start and end times as Unix milliseconds.
+
+    Raises ValueError for a missing time. _build_session then skips the event, because an
+    invented time would put the span in the wrong place in the trajectory.
+    """
     if isinstance(value, (int, float)):
         return datetime.fromtimestamp(value / 1000, tz=timezone.utc)
-    return datetime.now(tz=timezone.utc)
+    raise ValueError(f"invalid event time: {value!r}")
 
 
 def _text_of(content: Any) -> str:
@@ -296,7 +323,7 @@ def _tool_use_of(block: dict[str, Any]) -> dict[str, Any] | None:
     to ``{"type": "toolUse", "name": ..., "input": ..., "toolUseId": ...}``.
     """
     if isinstance(block.get("toolUse"), dict):
-        return block["toolUse"]
+        return cast(dict[str, Any], block["toolUse"])
     if block.get("type") == "toolUse":
         return block
     return None
