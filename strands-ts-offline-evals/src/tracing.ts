@@ -8,8 +8,7 @@ import {
 } from '@opentelemetry/sdk-trace-base'
 import { NodeTracerProvider } from '@opentelemetry/sdk-trace-node'
 
-// Strands sets traceAttributes only on the root agent span.
-// HoneyHive groups spans by honeyhive.session_id, so copy it to every child span.
+// Strands TS sets traceAttributes only on the agent span. Copy honeyhive.session_id to child spans.
 class HoneyHiveSessionPropagator implements SpanProcessor {
   onStart(span: Span, parentContext: Context): void {
     const parent = trace.getSpan(parentContext) as ReadableSpan | undefined
@@ -24,10 +23,7 @@ class HoneyHiveSessionPropagator implements SpanProcessor {
   async shutdown(): Promise<void> {}
 }
 
-/**
- * Registers a global tracer provider that exports Strands spans to HoneyHive over OTLP/HTTP.
- * Call it before the first Agent is constructed, so the agent's tracer resolves to this provider.
- */
+/** Exports Strands spans to HoneyHive over OTLP. Call it before the first agent runs. */
 export function setupTracing(apiKey: string, dataPlaneUrl: string): NodeTracerProvider {
   const provider = new NodeTracerProvider({
     spanProcessors: [
