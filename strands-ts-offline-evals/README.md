@@ -104,7 +104,7 @@ To use a different model provider, replace `OpenAIModel` with another Strands mo
 
 **Each span appears in its own session.** The agent is missing `traceAttributes: { 'honeyhive.session_id': sessionId }`, or `src/tracing.ts` is not registered. `setupTracing()` must run before the first agent call.
 
-**The run page shows no scores right after the run.** HoneyHive indexes sessions after they arrive, so results can trail the run by a few minutes. Refresh the page. To read the results in code, call `client.experiments.getSummary({ run_id })`.
+**The run page shows no scores right after the run.** HoneyHive indexes sessions shortly after they arrive. Refresh the page. To read the results in code, call `client.experiments.getSummary({ run_id })`.
 
 **A datapoint failed.** The session keeps the error in `metadata.error` and has no scores, and the run's `metadata.failed_datapoints` counts it. If an evaluator throws, the other evaluators still score that datapoint. If anything else throws, the run is marked `failed`.
 

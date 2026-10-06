@@ -102,7 +102,7 @@ pytest tests
 
 - The provider reads Strands spans. Sessions from other frameworks convert only when their spans are named `invoke_agent` and `execute_tool`, or are model events.
 - `available_tools` holds tool names only. HoneyHive does not store tool parameter schemas on the agent span.
-- HoneyHive indexes new sessions shortly after they arrive. A session that is a few minutes old can return no events yet. Retry after a short wait.
+- HoneyHive indexes new sessions shortly after they arrive. If you score a session immediately after it ends, the provider can return no events. Retry after a short wait.
 
 ## Learn more
 
