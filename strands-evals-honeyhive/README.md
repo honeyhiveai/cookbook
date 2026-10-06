@@ -22,7 +22,7 @@ Event loop cycle spans and the session event carry nothing the evaluators read, 
 | --- | --- |
 | Python 3.11+ | [python.org](https://www.python.org/downloads/) |
 | A HoneyHive session from a Strands agent | Trace a Strands agent with [the Strands integration](https://docs.honeyhive.ai/v2/integrations/strands), or run [strands-ts-offline-evals](../strands-ts-offline-evals) |
-| HoneyHive project API key (`hh_...`) | In HoneyHive, **Settings > Project > API Keys**, **Project** tab. An ingestion key cannot write the scores back. |
+| HoneyHive project API key (`hh_...`) | In HoneyHive, **Settings > Project > API Keys**, **Project** tab. Writing scores back to a session uses a project key. |
 | OpenAI API key | [platform.openai.com/api-keys](https://platform.openai.com/api-keys). Used by the evaluators' judge model. |
 
 ## Setup
@@ -98,11 +98,11 @@ The tests use two recorded HoneyHive sessions, one from a Python Strands agent a
 pytest tests
 ```
 
-## Limitations
+## Notes
 
 - The provider reads Strands spans. Sessions from other frameworks convert only when their spans are named `invoke_agent` and `execute_tool`, or are model events.
-- `available_tools` holds tool names only. HoneyHive does not store tool parameter schemas on the agent span.
-- HoneyHive indexes new sessions shortly after they arrive. If you score a session immediately after it ends, the provider can return no events. Retry after a short wait.
+- `available_tools` holds the tool names from the agent span.
+- If the provider returns no events for a session that just ended, retry after a short wait.
 
 ## Learn more
 

@@ -44,7 +44,7 @@ This links runs, sessions, and datapoints the same way as the HoneyHive Python S
 | --- | --- |
 | Node.js 22+ | [nodejs.org](https://nodejs.org). The Strands TypeScript SDK requires Node.js 22. |
 | pnpm | [pnpm.io/installation](https://pnpm.io/installation) |
-| HoneyHive project API key (`hh_...`) | In HoneyHive, **Settings > Project > API Keys**, **Project** tab. An ingestion key does not work, because the experiments API rejects it. |
+| HoneyHive project API key (`hh_...`) | In HoneyHive, **Settings > Project > API Keys**, **Project** tab. The experiments API uses a project key. |
 | OpenAI API key | [platform.openai.com/api-keys](https://platform.openai.com/api-keys). Used by the agent and the LLM judge. |
 
 ## Setup
@@ -104,7 +104,7 @@ To use a different model provider, replace `OpenAIModel` with another Strands mo
 
 **Each span appears in its own session.** The agent is missing `traceAttributes: { 'honeyhive.session_id': sessionId }`, or `src/tracing.ts` is not registered. `setupTracing()` must run before the first agent call.
 
-**The run page shows no scores right after the run.** HoneyHive indexes sessions shortly after they arrive. Refresh the page. To read the results in code, call `client.experiments.getSummary({ run_id })`.
+**The run page shows no scores right after the run.** Refresh the page after a short wait. To read the results in code, call `client.experiments.getSummary({ run_id })`.
 
 **A datapoint failed.** The session keeps the error in `metadata.error` and has no scores, and the run's `metadata.failed_datapoints` counts it. If an evaluator throws, the other evaluators still score that datapoint. If anything else throws, the run is marked `failed`.
 
