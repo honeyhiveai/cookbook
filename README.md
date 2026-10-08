@@ -62,6 +62,7 @@ Each cookbook contains its own README with specific instructions. All Python coo
 
 - **Python 3.11+** for Python examples
 - **Node.js 18+** for JavaScript examples
+- **Node.js 22+** for [strands-ts-offline-evals](./strands-ts-offline-evals)
 - **API Keys** for relevant services (HoneyHive, OpenAI, AWS, Azure, etc.)
 
 ## Support
