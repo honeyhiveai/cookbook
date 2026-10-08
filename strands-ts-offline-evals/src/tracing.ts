@@ -24,7 +24,7 @@ class HoneyHiveSessionPropagator implements SpanProcessor {
   async shutdown(): Promise<void> {}
 }
 
-const dataPlaneUrl = (process.env.HH_DATA_PLANE_URL || 'https://api.dp1.us.honeyhive.ai').replace(/\/+$/, '')
+const dataPlaneUrl = process.env.HH_DATA_PLANE_URL || 'https://api.dp1.us.honeyhive.ai'
 
 export const provider = new NodeTracerProvider({
   spanProcessors: [
