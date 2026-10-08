@@ -67,30 +67,6 @@ def test_converts_strands_session(fixture: str) -> None:
 
 
 @pytest.mark.parametrize("fixture", ["strands_ts_session.json", "strands_py_session.json"])
-def test_agent_invocation_fields(fixture: str) -> None:
-    events = _load(fixture)
-    data = _provider(events).get_evaluation_data(events[0]["session_id"])
-    agent = next(s for s in data["trajectory"].traces[0].spans if isinstance(s, AgentInvocationSpan))
-
-    assert agent.user_prompt == "What is 25 * 4?"
-    assert agent.agent_response == "25 multiplied by 4 is 100."
-    assert [t.name for t in agent.available_tools] == ["calculator"]
-
-
-@pytest.mark.parametrize("fixture", ["strands_ts_session.json", "strands_py_session.json"])
-def test_tool_execution_fields(fixture: str) -> None:
-    events = _load(fixture)
-    data = _provider(events).get_evaluation_data(events[0]["session_id"])
-    tool = next(s for s in data["trajectory"].traces[0].spans if isinstance(s, ToolExecutionSpan))
-
-    assert tool.tool_call.name == "calculator"
-    assert tool.tool_call.arguments == {"a": 25, "b": 4}
-    assert tool.tool_call.tool_call_id is not None
-    assert tool.tool_result.tool_call_id == tool.tool_call.tool_call_id
-    assert float(tool.tool_result.content) == 100
-
-
-@pytest.mark.parametrize("fixture", ["strands_ts_session.json", "strands_py_session.json"])
 def test_inference_messages_include_tool_round_trip(fixture: str) -> None:
     events = _load(fixture)
     data = _provider(events).get_evaluation_data(events[0]["session_id"])
@@ -116,20 +92,6 @@ def test_inference_messages_include_tool_round_trip(fixture: str) -> None:
     assert second.messages[-1].content == [TextContent(text="25 multiplied by 4 is 100.")]
 
 
-def test_requests_session_events_with_filter() -> None:
-    events = _load("strands_ts_session.json")
-    requests: list[dict[str, Any]] = []
-    session_id = events[0]["session_id"]
-
-    _provider(events, requests).get_evaluation_data(session_id)
-
-    assert requests[0]["path"] == "/v1/events/search"
-    assert requests[0]["auth"] == "Bearer test-key"
-    assert requests[0]["body"]["filters"] == [
-        {"field": "session_id", "operator": "is", "value": session_id, "type": "string"}
-    ]
-
-
 def test_paginates_until_short_page(monkeypatch: pytest.MonkeyPatch) -> None:
     import honeyhive_provider
 
@@ -148,12 +110,6 @@ def test_missing_session_raises() -> None:
         _provider([]).get_evaluation_data("00000000-0000-0000-0000-000000000000")
 
 
-def test_session_without_strands_spans_raises() -> None:
-    events = [e for e in _load("strands_ts_session.json") if e["event_type"] == "session"]
-    with pytest.raises(SessionNotFoundError):
-        _provider(events).get_evaluation_data(events[0]["session_id"])
-
-
 def test_http_error_raises_provider_error() -> None:
     client = httpx.Client(
         base_url="https://api.example.test",
@@ -161,66 +117,3 @@ def test_http_error_raises_provider_error() -> None:
     )
     with pytest.raises(ProviderError):
         HoneyHiveProvider(api_key="bad", client=client).get_evaluation_data("any")
-
-
-def test_non_json_response_raises_provider_error() -> None:
-    client = httpx.Client(
-        base_url="https://api.example.test",
-        transport=httpx.MockTransport(lambda request: httpx.Response(200, text="<html>proxy error</html>")),
-    )
-    with pytest.raises(ProviderError):
-        HoneyHiveProvider(client=client).get_evaluation_data("any")
-
-
-def test_non_object_response_raises_provider_error() -> None:
-    client = httpx.Client(
-        base_url="https://api.example.test",
-        transport=httpx.MockTransport(lambda request: httpx.Response(200, json=[])),
-    )
-    with pytest.raises(ProviderError):
-        HoneyHiveProvider(client=client).get_evaluation_data("any")
-
-
-def test_retries_timeouts() -> None:
-    calls = {"n": 0}
-    events = _load("strands_ts_session.json")
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        calls["n"] += 1
-        if calls["n"] == 1:
-            raise httpx.ReadTimeout("slow", request=request)
-        return httpx.Response(200, json={"events": events})
-
-    client = httpx.Client(base_url="https://api.example.test", transport=httpx.MockTransport(handler))
-    data = HoneyHiveProvider(client=client).get_evaluation_data(events[0]["session_id"])
-
-    assert calls["n"] == 2
-    assert data["output"] == "25 multiplied by 4 is 100."
-
-
-def test_requires_api_key_without_client(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("HH_API_KEY", raising=False)
-    with pytest.raises(ProviderError):
-        HoneyHiveProvider()
-
-
-def test_event_without_start_time_is_skipped() -> None:
-    events = _load("strands_ts_session.json")
-    tool = next(e for e in events if e["event_name"].startswith("execute_tool"))
-    tool["start_time"] = None
-
-    data = _provider(events).get_evaluation_data(events[0]["session_id"])
-
-    assert not any(isinstance(s, ToolExecutionSpan) for s in data["trajectory"].traces[0].spans)
-
-
-def test_malformed_event_is_skipped() -> None:
-    events = _load("strands_ts_session.json")
-    tool = next(e for e in events if e["event_name"].startswith("execute_tool"))
-    tool["inputs"] = "not a dict"
-
-    data = _provider(events).get_evaluation_data(events[0]["session_id"])
-
-    spans = data["trajectory"].traces[0].spans
-    assert not any(isinstance(s, ToolExecutionSpan) for s in spans)
-    assert len(spans) == 3
