@@ -84,7 +84,7 @@ Results: https://app.us.honeyhive.ai/p/<project-id>/experiments/runs/<run-id>
 Session IDs: <session-id> <session-id> <session-id>
 ```
 
-Open the link to see each datapoint's scores, and select a row to see that datapoint's trace. To score the same sessions with Strands Evals evaluators, pass the session IDs to [strands-evals-honeyhive](../strands-evals-honeyhive).
+Open the link to see each datapoint's scores, and select a row to see that datapoint's trace.
 
 To check types without running the experiment:
 
