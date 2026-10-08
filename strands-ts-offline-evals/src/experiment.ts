@@ -80,7 +80,7 @@ const client = new Client() // Reads HH_PROJECT_API_KEY and HH_DATA_PLANE_URL
 // The EXT- prefix marks a dataset that lives in your code, not in HoneyHive.
 const extId = (value: string) => `EXT-${createHash('sha256').update(value).digest('hex').slice(0, 16)}`
 const datasetId = extId(JSON.stringify(dataset))
-const datapointIds = dataset.map((point) => extId(point.question))
+const datapointIds = dataset.map((point, index) => extId(`${index}:${JSON.stringify(point)}`))
 
 const { run_id } = await client.experiments.createRun({
   name: `strands-support-agent-${new Date().toISOString().slice(0, 16)}`,
@@ -102,22 +102,25 @@ try {
     })
     sessionIds.push(sessionId)
 
-    const answer = await runAgent(point.question, sessionId)
-    await client.events.update({
-      event_id: sessionId,
-      outputs: { answer },
-      feedback: { ground_truth: { answer: point.answer } },
-      metrics: {
-        correctness: await correctness(point.question, answer, point.answer),
-        concise: concise(answer),
-      },
-    })
+    try {
+      const answer = await runAgent(point.question, sessionId)
+      await client.events.update({
+        event_id: sessionId,
+        outputs: { answer },
+        feedback: { ground_truth: { answer: point.answer } },
+        metrics: {
+          correctness: await correctness(point.question, answer, point.answer),
+          concise: concise(answer),
+        },
+      })
+    } catch (error) {
+      // One failed datapoint keeps its error and the run continues with the rest.
+      console.error(`Datapoint failed: ${point.question}`, error)
+      await client.events.update({ event_id: sessionId, metadata: { error: String(error) } })
+    }
   }
   await provider.forceFlush() // Send all spans before the run closes
   await client.experiments.updateRun({ run_id, status: 'completed', event_ids: sessionIds })
-} catch (error) {
-  await client.experiments.updateRun({ run_id, status: 'failed', event_ids: sessionIds })
-  throw error
 } finally {
   await provider.shutdown()
 }

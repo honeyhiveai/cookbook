@@ -12,7 +12,7 @@ It uses two standard pieces:
 | `src/tracing.ts` | Sends Strands spans to HoneyHive. A span processor copies `honeyhive.session_id` from the agent span to its child spans, so each datapoint's spans land in one session. |
 | `src/experiment.ts` | The agent, the dataset, two evaluators, and the experiment loop, in that order. |
 
-The experiment loop makes four API calls:
+The experiment makes these API calls:
 
 ```
 experiments.createRun                      → one run for the dataset
@@ -47,7 +47,7 @@ The script prints a link to the run:
 Results: https://app.us.honeyhive.ai/p/<project-id>/experiments/runs/<run-id>
 ```
 
-Open it to see each datapoint's `correctness` and `concise` scores and the run averages. Select a row to see that datapoint's trace. Scores can take a short time to appear, so refresh the page if they are missing.
+Open it to see each datapoint's `correctness` and `concise` scores and the run averages. Select a row to see that datapoint's trace.
 
 For dedicated or self-hosted deployments, set `HH_DATA_PLANE_URL` and `HH_APP_URL` in `.env`.
 
