@@ -27,7 +27,7 @@ for each datapoint:
 experiments.createRun before the loop, experiments.updateRun (status: completed) after it
 ```
 
-This links runs, sessions, and datapoints the same way as the HoneyHive Python SDK's `evaluate()`. One difference: this cookbook puts evaluator scores on the session event, and `evaluate()` puts them on the function's span.
+This links runs, sessions, and datapoints the same way as the HoneyHive Python SDK's `evaluate()`.
 
 | File | What it does |
 | --- | --- |

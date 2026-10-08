@@ -54,11 +54,13 @@ class HoneyHiveProvider(TraceProvider):
     Example::
 
         from strands_evals import Case, Experiment
+        from strands.models.openai import OpenAIModel
         from strands_evals.evaluators import HelpfulnessEvaluator
 
-        provider = HoneyHiveProvider()  # Reads HH_API_KEY
+        provider = HoneyHiveProvider()  # Reads HH_PROJECT_API_KEY
+        judge = OpenAIModel(model_id="gpt-4.1-mini")  # Strands Evals judges default to Bedrock
         case = Case(name="checkout-question", session_id="<honeyhive-session-id>", input="...")
-        report = Experiment(cases=[case], evaluators=[HelpfulnessEvaluator()]).run_evaluations(
+        report = Experiment(cases=[case], evaluators=[HelpfulnessEvaluator(model=judge)]).run_evaluations(
             provider.as_task()
         )
     """
@@ -73,10 +75,11 @@ class HoneyHiveProvider(TraceProvider):
         """Initialize the HoneyHive provider.
 
         Args:
-            api_key: HoneyHive project API key. Falls back to the HH_API_KEY environment variable.
+            api_key: HoneyHive project API key. Falls back to the HH_PROJECT_API_KEY environment variable,
+                then to HH_API_KEY.
                 Ignored when ``client`` is passed.
-            api_url: HoneyHive data plane URL. Falls back to the HH_API_URL environment variable,
-                then to the HoneyHive cloud URL.
+            api_url: HoneyHive data plane URL. Falls back to the HH_DATA_PLANE_URL environment variable,
+                then to HH_API_URL, then to the HoneyHive cloud URL.
             timeout: Request timeout in seconds.
             client: An httpx client to use instead of creating one. Tests use this to inject a
                 mock transport.
@@ -87,10 +90,12 @@ class HoneyHiveProvider(TraceProvider):
         if client is not None:
             self._client = client
             return
-        resolved_key = api_key or os.environ.get("HH_API_KEY")
+        resolved_key = api_key or os.environ.get("HH_PROJECT_API_KEY") or os.environ.get("HH_API_KEY")
         if not resolved_key:
-            raise ProviderError("HoneyHive API key required. Provide api_key or set HH_API_KEY.")
-        resolved_url = (api_url or os.environ.get("HH_API_URL") or _DEFAULT_API_URL).rstrip("/")
+            raise ProviderError("HoneyHive API key required. Provide api_key or set HH_PROJECT_API_KEY.")
+        resolved_url = (
+            api_url or os.environ.get("HH_DATA_PLANE_URL") or os.environ.get("HH_API_URL") or _DEFAULT_API_URL
+        ).rstrip("/")
         self._client = httpx.Client(
             base_url=resolved_url,
             headers={"Authorization": f"Bearer {resolved_key}"},

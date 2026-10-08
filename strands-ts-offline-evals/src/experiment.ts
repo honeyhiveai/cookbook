@@ -64,7 +64,6 @@ export async function runExperiment(options: ExperimentOptions): Promise<Experim
 
   async function runDatapoint(datapoint: Datapoint): Promise<void> {
     const sessionId = randomUUID()
-    sessionIds.push(sessionId)
 
     // Create the session first. The agent's spans join it through honeyhive.session_id.
     await client.sessions.create({
@@ -74,6 +73,7 @@ export async function runExperiment(options: ExperimentOptions): Promise<Experim
       inputs: datapoint.inputs,
       metadata: { run_id: runId, dataset_id: dataset.datasetId, datapoint_id: datapoint.id },
     })
+    sessionIds.push(sessionId)
 
     let output: string
     try {
@@ -98,11 +98,13 @@ export async function runExperiment(options: ExperimentOptions): Promise<Experim
         await runDatapoint(datapoint)
       }
     })
-    await Promise.all(workers)
+    // allSettled lets every worker stop before the run is closed.
+    const failure = (await Promise.allSettled(workers)).find((result) => result.status === 'rejected')
+    if (failure) throw failure.reason
     await flush()
   } catch (error) {
-    // Close the run so it does not stay in "running" in the HoneyHive UI.
-    await flush()
+    // Close the run so it does not stay in "running" in the HoneyHive UI. Keep the original error.
+    await flush().catch(() => undefined)
     await client.experiments.updateRun({ run_id: runId, status: 'failed', event_ids: sessionIds })
     throw error
   }

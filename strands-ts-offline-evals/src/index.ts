@@ -7,7 +7,7 @@ import { runExperiment } from './experiment.js'
 import { setupTracing } from './tracing.js'
 
 const projectApiKey = process.env.HH_PROJECT_API_KEY
-const dataPlaneUrl = process.env.HH_DATA_PLANE_URL ?? 'https://api.dp1.us.honeyhive.ai'
+const dataPlaneUrl = process.env.HH_DATA_PLANE_URL || 'https://api.dp1.us.honeyhive.ai'
 if (!projectApiKey) throw new Error('Set HH_PROJECT_API_KEY to a HoneyHive project API key')
 if (!process.env.OPENAI_API_KEY) throw new Error('Set OPENAI_API_KEY for the agent and the LLM judge')
 
@@ -35,7 +35,7 @@ try {
 
   // The run belongs to the project of the API key. Its scope_id is the project ID that the app URL uses.
   const { evaluation } = await client.experiments.getRun({ run_id: runId })
-  const appUrl = process.env.HH_APP_URL ?? 'https://app.us.honeyhive.ai'
+  const appUrl = process.env.HH_APP_URL || 'https://app.us.honeyhive.ai'
   console.log(`Ran ${sessionIds.length} datapoints, ${failedDatapoints} failed.`)
   console.log(`Results: ${appUrl}/p/${evaluation.scope_id}/experiments/runs/${runId}`)
   console.log(`Session IDs: ${sessionIds.join(' ')}`)

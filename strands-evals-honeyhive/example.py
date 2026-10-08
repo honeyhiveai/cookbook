@@ -22,7 +22,7 @@ from honeyhive_provider import HoneyHiveProvider
 
 def main(session_ids: list[str]) -> None:
     load_dotenv()
-    provider = HoneyHiveProvider()  # Reads HH_API_KEY and HH_API_URL
+    provider = HoneyHiveProvider()  # Reads HH_PROJECT_API_KEY and HH_DATA_PLANE_URL
 
     # Strands Evals judges use Amazon Bedrock by default. This example uses OpenAI instead.
     judge = OpenAIModel(model_id="gpt-4.1-mini")
@@ -46,8 +46,11 @@ def main(session_ids: list[str]) -> None:
         scores[row["name"]][metric] = score
         scores[row["name"]][f"{metric}_explanation"] = reason
 
-    api_url = os.environ.get("HH_API_URL", "https://api.dp1.us.honeyhive.ai").rstrip("/")
-    headers = {"Authorization": f"Bearer {os.environ['HH_API_KEY']}"}
+    api_url = (
+        os.environ.get("HH_DATA_PLANE_URL") or os.environ.get("HH_API_URL") or "https://api.dp1.us.honeyhive.ai"
+    ).rstrip("/")
+    api_key = os.environ.get("HH_PROJECT_API_KEY") or os.environ["HH_API_KEY"]
+    headers = {"Authorization": f"Bearer {api_key}"}
     with httpx.Client(base_url=api_url, headers=headers, timeout=30) as client:
         for session_id, metrics in scores.items():
             if not metrics:

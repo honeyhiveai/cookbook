@@ -22,7 +22,7 @@ Event loop cycle spans and the session event carry nothing the evaluators read, 
 | --- | --- |
 | Python 3.11+ | [python.org](https://www.python.org/downloads/) |
 | A HoneyHive session from a Strands agent | Trace a Strands agent with [the Strands integration](https://docs.honeyhive.ai/v2/integrations/strands), or run [strands-ts-offline-evals](../strands-ts-offline-evals) |
-| HoneyHive project API key (`hh_...`) | In HoneyHive, **Settings > Project > API Keys**, **Project** tab. Writing scores back to a session uses a project key. |
+| HoneyHive project API key (`hh_...`) | In HoneyHive, **Settings > Project > API Keys**, **Project** tab. The provider reads sessions with the events search API, which takes a project key. |
 | OpenAI API key | [platform.openai.com/api-keys](https://platform.openai.com/api-keys). Used by the evaluators' judge model. |
 
 ## Setup
@@ -37,14 +37,14 @@ cp .env.example .env
 Fill in `.env`:
 
 ```bash
-HH_API_KEY=your_honeyhive_api_key
+HH_PROJECT_API_KEY=your_honeyhive_api_key
 OPENAI_API_KEY=your_openai_api_key
 ```
 
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
-| `HH_API_KEY` | Yes | | API key for the HoneyHive project that holds the sessions |
-| `HH_API_URL` | No | `https://api.dp1.us.honeyhive.ai` | HoneyHive API host. Change it for dedicated or self-hosted deployments. |
+| `HH_PROJECT_API_KEY` | Yes | | API key for the HoneyHive project that holds the sessions. `HH_API_KEY` also works. |
+| `HH_DATA_PLANE_URL` | No | `https://api.dp1.us.honeyhive.ai` | HoneyHive API host. Change it for dedicated or self-hosted deployments. `HH_API_URL` also works. |
 | `OPENAI_API_KEY` | Yes | | Key for the judge model |
 
 ## Run
@@ -63,7 +63,7 @@ The example runs `HelpfulnessEvaluator` and `ToolSelectionAccuracyEvaluator` on 
 
 It writes the scores to the session as `strands.HelpfulnessEvaluator` and `strands.ToolSelectionAccuracyEvaluator` metrics, each with an `_explanation` metric that holds the judge's reason. The scores appear on the session in HoneyHive, next to any metrics the session already has.
 
-If a session cannot be fetched, the example skips it and prints the reason, so no score of 0 is written for an evaluation that did not run.
+If a session cannot be fetched or a judge call fails, the example skips that score and prints the reason, so no score of 0 is written for an evaluation that did not run.
 
 To find session IDs, open **Traces** in HoneyHive. The [strands-ts-offline-evals](../strands-ts-offline-evals) cookbook also prints the session IDs of its run.
 
@@ -78,10 +78,10 @@ from strands_evals.evaluators import GoalSuccessRateEvaluator
 
 from honeyhive_provider import HoneyHiveProvider
 
-provider = HoneyHiveProvider()  # Reads HH_API_KEY and HH_API_URL
+provider = HoneyHiveProvider()  # Reads HH_PROJECT_API_KEY and HH_DATA_PLANE_URL
 judge = OpenAIModel(model_id="gpt-4.1-mini")
 
-# The provider fetches the session by its ID, so the case input is not used.
+# The provider fetches the session by its ID, so the case input is only a label.
 cases = [Case(name="refund-flow", session_id="<honeyhive-session-id>", input="")]
 report = Experiment(cases=cases, evaluators=[GoalSuccessRateEvaluator(model=judge)]).run_evaluations(
     provider.as_task()
@@ -101,8 +101,7 @@ pytest tests
 ## Notes
 
 - The provider reads Strands spans. Sessions from other frameworks convert only when their spans are named `invoke_agent` and `execute_tool`, or are model events.
-- `available_tools` holds the tool names from the agent span.
-- If the provider returns no events for a session that just ended, retry after a short wait.
+- If the provider raises `SessionNotFoundError` for a session that just ended, retry after a short wait.
 
 ## Learn more
 
