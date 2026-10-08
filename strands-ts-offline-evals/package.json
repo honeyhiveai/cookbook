@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Run offline experiments on a Strands TypeScript agent with HoneyHive",
   "scripts": {
-    "start": "tsx src/index.ts",
+    "start": "tsx src/experiment.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

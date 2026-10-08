@@ -1,120 +1,127 @@
-import { randomUUID } from 'node:crypto'
-import { type Client } from '@honeyhive/api-client'
-import { type Datapoint, type LoadedDataset } from './dataset.js'
-import { type Evaluator } from './evaluators.js'
+import 'dotenv/config'
+import { provider } from './tracing.js' // Import before Strands so its spans go to HoneyHive
+import { createHash, randomUUID } from 'node:crypto'
+import { Client } from '@honeyhive/api-client'
+import { Agent, tool } from '@strands-agents/sdk'
+import { OpenAIModel } from '@strands-agents/sdk/models/openai'
+import OpenAI from 'openai'
+import { z } from 'zod'
 
-export interface ExperimentOptions {
-  readonly client: Client
-  readonly name: string
-  readonly dataset: LoadedDataset
-  /** Runs the system under test for one datapoint. Every span it emits must carry `sessionId`. */
-  readonly task: (datapoint: Datapoint, sessionId: string) => Promise<string>
-  readonly evaluators: Readonly<Record<string, Evaluator>>
-  /** Flushes buffered spans so they reach HoneyHive before the run closes. */
-  readonly flush: () => Promise<void>
-  readonly concurrency?: number
+// 1. The agent under test. Replace it with your own.
+const CATALOG: Record<string, { price_usd: number; stock: number; warranty_years: number }> = {
+  'trail-runner-2': { price_usd: 129, stock: 14, warranty_years: 1 },
+  'summit-jacket': { price_usd: 249, stock: 0, warranty_years: 3 },
+  'basecamp-tent-4p': { price_usd: 419, stock: 6, warranty_years: 5 },
 }
 
-export interface ExperimentResult {
-  readonly runId: string
-  readonly sessionIds: readonly string[]
-  /** Datapoints whose task threw. Their sessions have the error in `metadata.error` and no scores. */
-  readonly failedDatapoints: number
-}
+const getProduct = tool({
+  name: 'get_product',
+  description: 'Look up price, stock, and warranty for a product by its SKU.',
+  inputSchema: z.object({ sku: z.string() }),
+  callback: ({ sku }) => CATALOG[sku] ?? { error: `Unknown SKU: ${sku}` },
+})
 
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
-}
+const calculator = tool({
+  name: 'calculator',
+  description: 'Multiply a unit price by a quantity.',
+  inputSchema: z.object({ unit_price: z.number(), quantity: z.number() }),
+  callback: ({ unit_price, quantity }) => unit_price * quantity,
+})
 
-/**
- * Runs an offline experiment with the HoneyHive runs API.
- *
- * It links runs, sessions, and datapoints the same way as the Python SDK's evaluate(): one
- * session per datapoint, with `run_id`, `dataset_id`, and `datapoint_id` in session metadata.
- * Evaluator scores go on the session event as metrics.
- */
-export async function runExperiment(options: ExperimentOptions): Promise<ExperimentResult> {
-  const { client, name, dataset, task, evaluators, flush, concurrency = 4 } = options
-
-  const { run_id: runId } = await client.experiments.createRun({
-    name,
-    status: 'running',
-    dataset_id: dataset.datasetId,
-    datapoint_ids: dataset.datapoints.map((point) => point.id),
-    configuration: { evaluators: Object.keys(evaluators), concurrency },
+async function runAgent(question: string, sessionId: string): Promise<string> {
+  // A fresh agent per datapoint, so datapoints never share conversation state.
+  const agent = new Agent({
+    model: new OpenAIModel({ modelId: 'gpt-4.1-mini' }),
+    tools: [getProduct, calculator],
+    systemPrompt:
+      'You are a support agent for an outdoor gear store. Use get_product for any product fact ' +
+      'and calculator for any total. Answer in one or two sentences.',
+    printer: false,
+    traceAttributes: { 'honeyhive.session_id': sessionId }, // Puts the agent's spans in this session
   })
+  return String(await agent.invoke(question))
+}
 
-  const sessionIds: string[] = []
-  let failedDatapoints = 0
-  const queue = [...dataset.datapoints]
+// 2. The dataset.
+const dataset = [
+  { question: 'How much do 3 pairs of trail-runner-2 cost?', answer: '$387' },
+  { question: 'Is the summit-jacket in stock?', answer: 'No, the summit-jacket is out of stock.' },
+  { question: 'What warranty comes with the basecamp-tent-4p?', answer: '5 years' },
+]
 
-  async function score(datapoint: Datapoint, output: string): Promise<Record<string, number | boolean>> {
-    const metrics: Record<string, number | boolean> = {}
-    for (const [evaluatorName, evaluator] of Object.entries(evaluators)) {
-      try {
-        const value = await evaluator({ datapoint, output })
-        if (value !== undefined) metrics[evaluatorName] = value
-      } catch (error) {
-        // One failing evaluator must not discard the other scores for this datapoint.
-        console.warn(`Evaluator ${evaluatorName} failed on ${datapoint.id}: ${errorMessage(error)}`)
-      }
-    }
-    return metrics
-  }
+// 3. The evaluators. Each returns a number or a boolean, which HoneyHive aggregates across the run.
+const openai = new OpenAI()
 
-  async function runDatapoint(datapoint: Datapoint): Promise<void> {
+async function correctness(question: string, answer: string, reference: string): Promise<boolean> {
+  const response = await openai.chat.completions.create({
+    model: 'gpt-4.1-mini',
+    temperature: 0,
+    response_format: { type: 'json_object' },
+    messages: [
+      {
+        role: 'system',
+        content:
+          'You grade a support agent. Return JSON {"correct": boolean}. correct is true only if ' +
+          'the answer states the same facts as the reference. Ignore wording.',
+      },
+      { role: 'user', content: JSON.stringify({ question, reference, answer }) },
+    ],
+  })
+  return JSON.parse(response.choices[0]?.message.content ?? '{}').correct === true
+}
+
+function concise(answer: string): boolean {
+  return answer.split(/[.!?](?:\s|$)/).filter((sentence) => sentence.trim()).length <= 2
+}
+
+// 4. The experiment. One session per datapoint, linked to the run and the datapoint.
+const client = new Client() // Reads HH_PROJECT_API_KEY and HH_DATA_PLANE_URL
+
+// The EXT- prefix marks a dataset that lives in your code, not in HoneyHive.
+const extId = (value: string) => `EXT-${createHash('sha256').update(value).digest('hex').slice(0, 16)}`
+const datasetId = extId(JSON.stringify(dataset))
+const datapointIds = dataset.map((point) => extId(point.question))
+
+const { run_id } = await client.experiments.createRun({
+  name: `strands-support-agent-${new Date().toISOString().slice(0, 16)}`,
+  status: 'running',
+  dataset_id: datasetId,
+  datapoint_ids: datapointIds,
+})
+
+const sessionIds: string[] = []
+try {
+  for (const [index, point] of dataset.entries()) {
     const sessionId = randomUUID()
-
-    // Create the session first. The agent's spans join it through honeyhive.session_id.
     await client.sessions.create({
       session_id: sessionId,
-      session_name: name,
+      session_name: 'strands-support-agent',
       source: 'evaluation',
-      inputs: datapoint.inputs,
-      metadata: { run_id: runId, dataset_id: dataset.datasetId, datapoint_id: datapoint.id },
+      inputs: { question: point.question },
+      metadata: { run_id, dataset_id: datasetId, datapoint_id: datapointIds[index] },
     })
     sessionIds.push(sessionId)
 
-    let output: string
-    try {
-      output = await task(datapoint, sessionId)
-    } catch (error) {
-      failedDatapoints += 1
-      await client.events.update({ event_id: sessionId, metadata: { error: errorMessage(error) } })
-      return
-    }
-
+    const answer = await runAgent(point.question, sessionId)
     await client.events.update({
       event_id: sessionId,
-      outputs: { answer: output },
-      metrics: await score(datapoint, output),
-      ...(datapoint.ground_truth ? { feedback: { ground_truth: datapoint.ground_truth } } : {}),
+      outputs: { answer },
+      feedback: { ground_truth: { answer: point.answer } },
+      metrics: {
+        correctness: await correctness(point.question, answer, point.answer),
+        concise: concise(answer),
+      },
     })
   }
-
-  try {
-    const workers = Array.from({ length: Math.min(concurrency, queue.length) }, async () => {
-      for (let datapoint = queue.shift(); datapoint; datapoint = queue.shift()) {
-        await runDatapoint(datapoint)
-      }
-    })
-    // allSettled lets every worker stop before the run is closed.
-    const failure = (await Promise.allSettled(workers)).find((result) => result.status === 'rejected')
-    if (failure) throw failure.reason
-    await flush()
-  } catch (error) {
-    // Close the run so it does not stay in "running" in the HoneyHive UI. Keep the original error.
-    await flush().catch(() => undefined)
-    await client.experiments.updateRun({ run_id: runId, status: 'failed', event_ids: sessionIds })
-    throw error
-  }
-
-  await client.experiments.updateRun({
-    run_id: runId,
-    status: 'completed',
-    event_ids: sessionIds,
-    metadata: { failed_datapoints: failedDatapoints },
-  })
-
-  return { runId, sessionIds, failedDatapoints }
+  await provider.forceFlush() // Send all spans before the run closes
+  await client.experiments.updateRun({ run_id, status: 'completed', event_ids: sessionIds })
+} catch (error) {
+  await client.experiments.updateRun({ run_id, status: 'failed', event_ids: sessionIds })
+  throw error
+} finally {
+  await provider.shutdown()
 }
+
+const { evaluation } = await client.experiments.getRun({ run_id })
+const appUrl = process.env.HH_APP_URL || 'https://app.us.honeyhive.ai'
+console.log(`Results: ${appUrl}/p/${evaluation.scope_id}/experiments/runs/${run_id}`)
