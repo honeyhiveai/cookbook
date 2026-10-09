@@ -19,6 +19,7 @@ Integration examples for AI observability and evaluation with HoneyHive.
 |----------|-------------|
 | [honeyhive-skills-strands](./honeyhive-skills-strands) | Strands + OpenAI baseline for trying HoneyHive Agent Skills (`npx skills`) |
 | [cursor-sdk-honeyhive](./cursor-sdk-honeyhive) | HoneyHive tracing for Cursor SDK agent runs and tool calls |
+| [strands-ts-offline-evals](./strands-ts-offline-evals) | Offline experiments for a Strands TypeScript agent with OTLP tracing and the HoneyHive API client |
 | [salesforce-agentforce-cookbook](./salesforce-agentforce-cookbook) | Poll Salesforce Agentforce Session Trace OTel and forward each conversation as one HoneyHive session |
 
 ### RAG & Vector Databases
@@ -61,6 +62,7 @@ Each cookbook contains its own README with specific instructions. All Python coo
 
 - **Python 3.11+** for Python examples
 - **Node.js 18+** for JavaScript examples
+- **Node.js 22+** for [strands-ts-offline-evals](./strands-ts-offline-evals)
 - **API Keys** for relevant services (HoneyHive, OpenAI, AWS, Azure, etc.)
 
 ## Support
