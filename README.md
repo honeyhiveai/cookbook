@@ -22,6 +22,12 @@ Integration examples for AI observability and evaluation with HoneyHive.
 | [strands-ts-offline-evals](./strands-ts-offline-evals) | Offline experiments for a Strands TypeScript agent with OTLP tracing and the HoneyHive API client |
 | [salesforce-agentforce-cookbook](./salesforce-agentforce-cookbook) | Poll Salesforce Agentforce Session Trace OTel and forward each conversation as one HoneyHive session |
 
+### Governance & Observability
+
+| Cookbook | Description |
+|----------|-------------|
+| [acs-honeyhive-cookbook](./acs-honeyhive-cookbook) | Emit Microsoft Agent Control Specification (ACS) runtime decisions as HoneyHive spans (open trust stack: enforce + observe) |
+
 ### RAG & Vector Databases
 
 | Cookbook | Description |
