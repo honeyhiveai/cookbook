@@ -7,3 +7,7 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "honeyhive",
 ]
+
+[tool.uv]
+# strands-agents caps mcp <2.2; pin to the patched 1.x line (GHSA: StreamableHTTP session accumulation)
+constraint-dependencies = ["mcp>=1.30.0,<2.0.0"]
