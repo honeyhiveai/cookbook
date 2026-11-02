@@ -32,6 +32,7 @@ Integration examples for AI observability and evaluation with HoneyHive.
 
 | Cookbook | Description |
 |----------|-------------|
+| [drex-honeyhive-cookbook](./drex-honeyhive-cookbook) | HoneyHive tracing and a judge evaluator for Drex, a decision-model API served on TypeSafe's System One endpoint |
 | [openai-honeyhive-cookbook](./openai-honeyhive-cookbook) | HoneyHive tracing for OpenAI API (chat, function calling, structured outputs, reasoning) |
 | [aws-bedrock-honeyhive-cookbook](./aws-bedrock-honeyhive-cookbook) | HoneyHive tracing for AWS Bedrock models |
 | [azure-openai-honeyhive-cookbook](./azure-openai-honeyhive-cookbook) | HoneyHive tracing for Azure OpenAI (chat, function calling, structured outputs, reasoning) |

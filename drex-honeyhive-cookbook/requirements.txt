@@ -1,0 +1,3 @@
+honeyhive>=1.8
+typesafe-sdk>=0.7.5
+openinference-instrumentation-typesafe>=0.1.7
