@@ -1,0 +1,109 @@
+{
+  "customer_id": "CUST-1001",
+  "profile": {
+    "full_name": "Sarah Chen",
+    "date_of_birth": "1987-03-14",
+    "email": "s.chen@example.com",
+    "phone": "+1-415-555-0142",
+    "address": "1846 Bryant St, Apt 4, San Francisco, CA 94110",
+    "ssn_last4": "4417",
+    "customer_since": "2016-08-02",
+    "tier": "Premier"
+  },
+  "accounts": [
+    {
+      "account_id": "ACCT-8891",
+      "type": "checking",
+      "mask": "8891",
+      "balance": 12480.55,
+      "currency": "USD",
+      "status": "active"
+    },
+    {
+      "account_id": "ACCT-2210",
+      "type": "savings",
+      "mask": "2210",
+      "balance": 64300.0,
+      "currency": "USD",
+      "status": "active"
+    }
+  ],
+  "transactions": [
+    {
+      "txn_id": "T-90041",
+      "account_id": "ACCT-8891",
+      "date": "2026-08-14",
+      "merchant": "Bi-Rite Market",
+      "amount": -84.22,
+      "category": "groceries"
+    },
+    {
+      "txn_id": "T-90038",
+      "account_id": "ACCT-8891",
+      "date": "2026-08-12",
+      "merchant": "Muni TransitLink",
+      "amount": -46.0,
+      "category": "transit"
+    },
+    {
+      "txn_id": "T-90033",
+      "account_id": "ACCT-8891",
+      "date": "2026-08-09",
+      "merchant": "Four Barrel Coffee",
+      "amount": -12.75,
+      "category": "dining"
+    },
+    {
+      "txn_id": "T-90027",
+      "account_id": "ACCT-8891",
+      "date": "2026-08-05",
+      "merchant": "Pacific Gas & Electric",
+      "amount": -168.4,
+      "category": "utilities"
+    },
+    {
+      "txn_id": "T-90021",
+      "account_id": "ACCT-8891",
+      "date": "2026-08-01",
+      "merchant": "Northgate Property Mgmt",
+      "amount": -3250.0,
+      "category": "rent"
+    },
+    {
+      "txn_id": "T-90018",
+      "account_id": "ACCT-8891",
+      "date": "2026-07-31",
+      "merchant": "Lumen Design Studio (payroll)",
+      "amount": 5420.18,
+      "category": "income"
+    },
+    {
+      "txn_id": "T-90012",
+      "account_id": "ACCT-2210",
+      "date": "2026-07-28",
+      "merchant": "Transfer from checking",
+      "amount": 1200.0,
+      "category": "transfer"
+    },
+    {
+      "txn_id": "T-90007",
+      "account_id": "ACCT-8891",
+      "date": "2026-07-24",
+      "merchant": "Green Apple Books",
+      "amount": -37.9,
+      "category": "shopping"
+    },
+    {
+      "txn_id": "T-90003",
+      "account_id": "ACCT-2210",
+      "date": "2026-07-20",
+      "merchant": "Interest payment",
+      "amount": 88.14,
+      "category": "interest"
+    }
+  ],
+  "notes": [
+    "Customer called 2026-07-30 re: disputed charge; resolved.",
+    "Enrolled in paperless statements 2025-11-04."
+  ]
+}

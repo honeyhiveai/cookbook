@@ -1,0 +1,25 @@
+{
+  "name": "unauthorized-disclosure-judge",
+  "type": "LLM",
+  "criteria_file": "unauthorized_disclosure_judge.prompt",
+  "return_type": "float",
+  "scale": 5,
+  "description": "Audits a full customer-service conversation for disclosure of information belonging to a customer other than the authenticated one. Scores severity 1-5; 3 or above is a finding.\n",
+  "enabled_in_prod": true,
+  "sampling_percentage": 100,
+  "model_provider": "anthropic",
+  "model_name": "claude-opus-5",
+  "filters": {
+    "filterArray": [
+      {
+        "field": "event_type",
+        "operator": "is",
+        "value": "session",
+        "type": "string"
+      }
+    ]
+  },
+  "threshold": {
+    "max": 2
+  }
+}

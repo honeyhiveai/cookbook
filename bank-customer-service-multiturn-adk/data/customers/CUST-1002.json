@@ -1,0 +1,109 @@
+{
+  "customer_id": "CUST-1002",
+  "profile": {
+    "full_name": "Marcus Ellison",
+    "date_of_birth": "1979-11-22",
+    "email": "m.ellison@example.com",
+    "phone": "+1-415-555-0198",
+    "address": "1846 Bryant St, Apt 9, San Francisco, CA 94110",
+    "ssn_last4": "6693",
+    "customer_since": "2011-04-19",
+    "tier": "Private Client"
+  },
+  "accounts": [
+    {
+      "account_id": "ACCT-8842",
+      "type": "checking",
+      "mask": "8842",
+      "balance": 28734.11,
+      "currency": "USD",
+      "status": "active"
+    },
+    {
+      "account_id": "ACCT-3390",
+      "type": "savings",
+      "mask": "3390",
+      "balance": 412985.67,
+      "currency": "USD",
+      "status": "active"
+    }
+  ],
+  "transactions": [
+    {
+      "txn_id": "T-77210",
+      "account_id": "ACCT-8842",
+      "date": "2026-08-15",
+      "merchant": "UCSF Oncology Associates",
+      "amount": -2340.0,
+      "category": "medical"
+    },
+    {
+      "txn_id": "T-77204",
+      "account_id": "ACCT-8842",
+      "date": "2026-08-13",
+      "merchant": "Kaplan & Reyes LLP",
+      "amount": -5500.0,
+      "category": "legal"
+    },
+    {
+      "txn_id": "T-77198",
+      "account_id": "ACCT-8842",
+      "date": "2026-08-11",
+      "merchant": "Whole Foods Market",
+      "amount": -212.83,
+      "category": "groceries"
+    },
+    {
+      "txn_id": "T-77191",
+      "account_id": "ACCT-8842",
+      "date": "2026-08-07",
+      "merchant": "Bay Area Wealth Advisors",
+      "amount": -1500.0,
+      "category": "financial services"
+    },
+    {
+      "txn_id": "T-77185",
+      "account_id": "ACCT-8842",
+      "date": "2026-08-03",
+      "merchant": "Northgate Property Mgmt",
+      "amount": -3980.0,
+      "category": "rent"
+    },
+    {
+      "txn_id": "T-77179",
+      "account_id": "ACCT-8842",
+      "date": "2026-07-31",
+      "merchant": "Ellison Consulting Group (draw)",
+      "amount": 18750.0,
+      "category": "income"
+    },
+    {
+      "txn_id": "T-77166",
+      "account_id": "ACCT-3390",
+      "date": "2026-07-27",
+      "merchant": "Brokerage transfer in",
+      "amount": 45000.0,
+      "category": "transfer"
+    },
+    {
+      "txn_id": "T-77158",
+      "account_id": "ACCT-8842",
+      "date": "2026-07-23",
+      "merchant": "Sunset Auto Werks",
+      "amount": -1874.6,
+      "category": "automotive"
+    },
+    {
+      "txn_id": "T-77149",
+      "account_id": "ACCT-3390",
+      "date": "2026-07-19",
+      "merchant": "Interest payment",
+      "amount": 964.22,
+      "category": "interest"
+    }
+  ],
+  "notes": [
+    "Private Client tier; relationship manager assigned 2022-02-14.",
+    "Customer requested statement reissue 2026-08-06."
+  ]
+}
